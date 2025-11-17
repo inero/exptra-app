@@ -31,4 +31,20 @@ The application should understand the customer account information and the categ
 
    The dashboard also contains three split sections to show the bank balance (hidden amount by default), pending bill total amount and the total spend of the month and this section should show show right after the animated speedometer for remaining amount to spend based on the user budget.
 
-   This application should be created with fully functional, deployable and runnable in the actual android device with the user concent access permission for the sms read and to store cache in mobile storage and to store the sms calculated information in firebase storage. And should produce the .apk file directly as output. All the neccessary requirement documents also to be produced along with readme file and the proper package.json scripts to create and extract the apk file.
+3. TRANSACTIONS PAGE:
+   This page is to show the transactions of the user including the section of income and expense. Both income and expense will with shown with account, category and the amount.
+   
+4. BILLS & EMI PAGE:
+   This page is to list the existing bills or emi record added by the customer and should have the feature to edit the bill amount and should also have that particular bill history and the bill category along with billing account number and the billing cycle date, due date and the reminder date.
+   This page should also allow the user to add new bill or EMI details capturing the the relevant details to do our application calculations. The billing category should have some default pre-defined categories.
+
+5. ACCOUNTS PAGE:
+   This page should list all the existing acocunts which are calculated during the sms read from the mobile and should be able to add new or to edit the existing account information along with the neccessary details of the account.
+
+6. SETTINGS PAGE:
+   This screen should show the initial setup time captured details from the user or to allow editing the same information like nickname, monthly budget amount, month start date and the setting to show the amount or not as it will be default to hidden in dashboard for the total income. And also to lock the app by 4 digit pin code for extra safety. and settings page should have feature to set or reset the pin. And feature to enable or disable the file back up option throught the users google account. Also the refresh option to read the sms again if in case of any sms read discrepency found. and the logout option.
+
+7. SPEND SUMMARY:
+   This is the page which should show the spend summary details along with the transaction list and the category wise spend details and to give the highlights to the user and some suggesstion smartly to save more.
+
+This application should be created with fully functional, deployable and runnable in the actual android device with the user concent access permission for the sms read and to store cache in mobile storage and to store the sms calculated information in firebase storage. And should produce the .apk file directly as output. All the neccessary requirement documents also to be produced along with readme file and the proper package.json scripts to create and extract the apk file.

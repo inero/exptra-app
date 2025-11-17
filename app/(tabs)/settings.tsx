@@ -8,19 +8,24 @@ import {
   TextInput,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTransactions } from '../../contexts/TransactionContext';
 import { useRouter } from 'expo-router';
+import SMSService from '../../utils/smsService';
 
 export default function SettingsScreen() {
   const { settings, updateSettings } = useApp();
   const { signOut } = useAuth();
+  const { syncSMSTransactions, transactions } = useTransactions();
   const router = useRouter();
   
   const [nickname, setNickname] = useState(settings.nickname);
   const [budget, setBudget] = useState(settings.monthlyBudget.toString());
   const [monthStartDate, setMonthStartDate] = useState(settings.monthStartDate.toString());
+  const [syncing, setSyncing] = useState(false);
 
   const handleSave = async () => {
     const budgetNum = parseFloat(budget);
@@ -62,6 +67,75 @@ export default function SettingsScreen() {
           onPress: async () => {
             await signOut();
             router.replace('/(auth)/login');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSyncSMS = async () => {
+    const hasPermission = await SMSService.checkSMSPermission();
+    
+    if (!hasPermission) {
+      Alert.alert(
+        'SMS Permission Required',
+        'Please grant SMS permission to sync transactions from your banking messages.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Grant Permission',
+            onPress: async () => {
+              const granted = await SMSService.requestSMSPermission();
+              if (granted) {
+                performSync();
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    performSync();
+  };
+
+  const performSync = async () => {
+    setSyncing(true);
+    try {
+      const count = await syncSMSTransactions(false);
+      if (count > 0) {
+        Alert.alert('Success', `Synced ${count} new transactions from SMS.`);
+      } else {
+        Alert.alert('No New Transactions', 'No new banking SMS found.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sync SMS. Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleResyncAllSMS = () => {
+    Alert.alert(
+      'Resync All SMS',
+      'This will re-import all banking SMS from the last 6 months. Duplicate transactions may be created. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Resync',
+          style: 'destructive',
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              await updateSettings({ isInitialSMSSyncComplete: false });
+              const count = await syncSMSTransactions(true);
+              await updateSettings({ isInitialSMSSyncComplete: true });
+              Alert.alert('Success', `Re-imported ${count} transactions from SMS.`);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to resync SMS. Please try again.');
+            } finally {
+              setSyncing(false);
+            }
           },
         },
       ]
@@ -206,6 +280,35 @@ const styles = StyleSheet.create({
   },
   signOutButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  syncButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  syncButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  syncButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  resyncButton: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    marginBottom: 10,
+  },
+  resyncButtonText: {
+    color: '#2196F3',
     fontSize: 16,
     fontWeight: '600',
   },

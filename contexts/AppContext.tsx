@@ -7,6 +7,7 @@ export interface UserSettings {
   monthlyBudget: number;
   monthStartDate: number;
   isInitialSetupComplete: boolean;
+  isInitialSMSSyncComplete: boolean;
 }
 
 interface AppContextType {
@@ -20,6 +21,7 @@ const defaultSettings: UserSettings = {
   monthlyBudget: 0,
   monthStartDate: 1,
   isInitialSetupComplete: false,
+  isInitialSMSSyncComplete: false,
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);

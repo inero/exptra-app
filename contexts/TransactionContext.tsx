@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
+import SMSService from '../utils/smsService';
 
 export interface Transaction {
   id: string;
@@ -35,6 +36,7 @@ interface TransactionContextType {
   updateBill: (id: string, bill: Partial<Bill>) => Promise<void>;
   deleteBill: (id: string) => Promise<void>;
   loadTransactions: () => Promise<void>;
+  syncSMSTransactions: (isInitial?: boolean) => Promise<number>;
   getMonthlyTransactions: (year: number, month: number) => Transaction[];
   getTotalIncome: (year: number, month: number) => number;
   getTotalExpense: (year: number, month: number) => number;
@@ -147,6 +149,36 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     await saveBills(newBills);
   };
 
+  const syncSMSTransactions = async (isInitial: boolean = false): Promise<number> => {
+    if (!user) return 0;
+
+    try {
+      const hasPermission = await SMSService.checkSMSPermission();
+      if (!hasPermission) {
+        console.log('No SMS permission, skipping sync');
+        return 0;
+      }
+
+      let count = 0;
+      if (isInitial) {
+        // Initial load - read all SMS from last 6 months
+        count = await SMSService.processInitialSMS(addTransaction);
+        console.log(`Initial SMS sync completed: ${count} transactions added`);
+      } else {
+        // Regular sync - read only new SMS
+        count = await SMSService.processNewSMS(addTransaction);
+        if (count > 0) {
+          console.log(`SMS sync completed: ${count} new transactions added`);
+        }
+      }
+
+      return count;
+    } catch (error) {
+      console.error('Error syncing SMS transactions:', error);
+      return 0;
+    }
+  };
+
   const getMonthlyTransactions = (year: number, month: number): Transaction[] => {
     return transactions.filter(t => {
       const tDate = new Date(t.date);
@@ -205,6 +237,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         updateBill,
         deleteBill,
         loadTransactions,
+        syncSMSTransactions,
         getMonthlyTransactions,
         getTotalIncome,
         getTotalExpense,

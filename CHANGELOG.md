@@ -5,6 +5,70 @@ All notable changes to the Exptra-AI project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-11-17
+
+### Added - SMS Reading Feature 🎉
+
+#### Automatic SMS Processing
+- Automatic SMS inbox reading for banking transactions
+- Initial bulk import of last 6 months of SMS messages
+- Incremental sync for new SMS on app open and pull-to-refresh
+- Duplicate prevention system using SMS ID tracking
+- Sample SMS data for development/testing without real SMS
+
+#### SMS Service & Parser
+- Native SMS reader integration (`utils/nativeSMSReader.ts`)
+- Comprehensive SMS service (`utils/smsService.ts`)
+- Enhanced SMS parser with multi-bank support (`utils/smsParser.ts`)
+- Support for 5 major banks: SBI, HDFC, ICICI, Axis, Kotak
+
+#### Transaction Management
+- Auto-import transactions from SMS
+- Auto-categorization based on merchant/description
+- Manual override for all auto-detected transactions
+- SMS-to-transaction mapping with unique IDs
+
+#### UI Enhancements
+- SMS sync button in Settings
+- "Sync New SMS" and "Resync All SMS" options
+- Sync progress indicators on Dashboard
+- SMS sync status display in About section
+- Pull-to-refresh triggers SMS sync
+
+#### Context Updates
+- Added `syncSMSTransactions()` to TransactionContext
+- Added `isInitialSMSSyncComplete` to AppContext
+- Integrated SMS service across the app
+
+#### Developer Features
+- Sample SMS data generator for testing
+- Comprehensive error handling
+- Permission management utilities
+- Development mode detection
+
+### Changed
+- Dashboard now shows sync indicator
+- Refresh control triggers SMS sync
+- Settings screen expanded with SMS options
+- Transaction count includes SMS-imported transactions
+
+### Dependencies
+- Added `expo-sms-retriever`
+- Added `react-native-android-sms-listener`
+- Updated context providers for SMS integration
+
+### Documentation
+- Created `SMS-FEATURE.md` - Complete SMS feature guide
+- Updated `README.md` with SMS reading documentation
+- Added troubleshooting section for SMS issues
+- Updated project structure documentation
+
+### Technical
+- SMS permission handling
+- AsyncStorage for processed SMS tracking
+- Last read timestamp tracking
+- Six-month lookback window for initial sync
+
 ## [1.0.0] - 2025-11-17
 
 ### Added
@@ -152,6 +216,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Version History
+
+### [1.1.0] - 2025-11-17
+- **Major Feature**: Automatic SMS reading and parsing
+- Initial bulk SMS import (6 months)
+- Real-time SMS sync
+- Multi-bank support (5 banks)
+- Auto-categorization
+- Duplicate prevention
+- Enhanced UI with sync indicators
 
 ### [1.0.0] - 2025-11-17
 - Initial release

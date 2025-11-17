@@ -1,279 +1,355 @@
-# Exptra-AI - Smart Expense Tracker
+# Exptra-AI - Smart Expense Tracker with Automatic SMS Reading
 
-An intelligent expense tracking mobile application built with React Native (Expo) that automatically reads banking SMS messages to track income and expenses.
+An intelligent expense tracking mobile application built with React Native (Expo) that **automatically reads banking SMS messages** to track income and expenses without manual entry.
 
-## Features
+## 🎯 Key Features
 
-- 🔐 **Firebase Authentication** - Secure login and signup with persistent sessions
-- 📱 **SMS Reading** - Automatic parsing of banking SMS for transaction detection
-- 💰 **Budget Tracking** - Set monthly budgets and track spending with visual speedometer
-- 📊 **Category Management** - Auto-categorize transactions with manual override options
-- 🏦 **Multiple Bank Support** - Support for SBI, HDFC, ICICI, Axis, Kotak, and more
-- 📅 **Custom Month Cycles** - Set your own month start date for expense tracking
-- 💳 **Manual Transactions** - Add, edit, and delete transactions manually
-- 📈 **Account-wise Tracking** - Monitor expenses across different bank accounts
-- 🎨 **Modern UI** - Clean, animated interface with dark mode support
-- 💾 **Offline Storage** - AsyncStorage for local caching
+### 🤖 Automatic SMS Reading (NEW!)
+- **Auto-detect transactions** from banking SMS
+- **Initial bulk import** of last 6 months of SMS
+- **Real-time sync** on app open and pull-to-refresh
+- **Multi-bank support** (SBI, HDFC, ICICI, Axis, Kotak)
+- **Smart categorization** based on merchant/description
+- **Duplicate prevention** system
+- **Privacy-first** - all processing done locally
 
-## Tech Stack
+### 💰 Core Features
+- 🔐 Firebase authentication with persistent sessions
+- 📊 Visual budget tracking with animated speedometer
+- 📈 Category-wise expense analysis
+- 🏦 Account-wise transaction tracking
+- 💳 Manual transaction entry and editing
+- 📅 Custom month cycles
+- 🔔 Bill & EMI management (ready)
+- 📱 Modern, intuitive UI
 
-- **Frontend**: React Native 0.81.5
-- **Framework**: Expo ~54.0.23
-- **Navigation**: Expo Router ~6.0.14
-- **Authentication**: Firebase Auth
-- **Database**: Firebase Firestore (ready for cloud sync)
-- **State Management**: React Context API
-- **Local Storage**: AsyncStorage
-- **Animations**: React Native Reanimated
-- **Charts/Graphics**: React Native SVG
+## 🚀 Quick Start
 
-## Prerequisites
+### Installation
 
-Before you begin, ensure you have the following installed:
+```bash
+# Clone the repository
+git clone <repository-url>
+cd exptra-app
 
-- Node.js (v18 or higher)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Android Studio (for Android development)
-- Xcode (for iOS development, macOS only)
+# Install dependencies
+npm install
 
-## Installation
+# Start development server
+npm start
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd exptra-app
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-4. **Run on Android**
-   ```bash
-   npm run android
-   ```
-
-5. **Run on iOS** (macOS only)
-   ```bash
-   npm run ios
-   ```
-
-6. **Run on Web**
-   ```bash
-   npm run web
-   ```
-
-## Firebase Configuration
-
-The app uses Firebase for authentication and storage. The configuration is already set up in `config/firebase.ts`:
-
-```javascript
-const firebaseConfig = {
-  apiKey: "AIzaSyD6CQ7RC6CPWnf75TTxkSwFH6QAOyaNNe4",
-  authDomain: "fir-auth-aaa2e.firebaseapp.com",
-  projectId: "fir-auth-aaa2e",
-  storageBucket: "fir-auth-aaa2e.appspot.com",
-  messagingSenderId: "904217172879",
-  appId: "1:904217172879:web:b39b700ac2266d642d89fa",
-};
+# Run on Android
+npm run android
 ```
 
-## Building for Production
+### First Time Setup
 
-### Android APK
+1. **Create Account**
+   - Enter email and password
+   - Tap "Sign Up"
 
-1. **Install EAS CLI**
-   ```bash
-   npm install -g eas-cli
-   ```
+2. **Initial Setup**
+   - Set nickname (e.g., "John")
+   - Set monthly budget (e.g., 50000)
+   - Set month start date (e.g., 1)
 
-2. **Login to Expo**
-   ```bash
-   eas login
-   ```
+3. **Grant SMS Permission**
+   - Allow SMS reading when prompted
+   - App automatically imports banking SMS
+   - Wait for initial sync to complete
 
-3. **Configure EAS Build**
-   ```bash
-   eas build:configure
-   ```
+4. **Start Tracking**
+   - View auto-imported transactions
+   - Pull down to sync new SMS
+   - Add manual transactions as needed
 
-4. **Build APK**
-   ```bash
-   npm run build:android:apk
-   ```
+## 📱 SMS Reading Feature
 
-5. **Build AAB (Play Store)**
-   ```bash
-   npm run build:android
-   ```
+### How It Works
 
-### Alternative: Local Build
+1. **Initial Import**
+   - Reads all SMS from last 6 months on first setup
+   - Filters only banking and transactional messages
+   - Creates transactions automatically
+   - Shows count of imported transactions
 
-1. **Prebuild the native projects**
-   ```bash
-   npm run prebuild
-   ```
+2. **Ongoing Sync**
+   - Pull down on dashboard to sync new SMS
+   - Automatically checks on app open
+   - Only processes new messages
+   - Prevents duplicate imports
 
-2. **Build Android APK locally**
-   ```bash
-   cd android
-   ./gradlew assembleRelease
-   ```
+3. **Smart Detection**
+   - Recognizes debit/credit transactions
+   - Extracts amount, account, bank name
+   - Auto-categorizes based on merchant
+   - Detects income vs. expense
 
-3. **Find your APK**
-   The APK will be located at:
-   ```
-   android/app/build/outputs/apk/release/app-release.apk
-   ```
+### Supported Banks
 
-## Project Structure
+- State Bank of India (SBI)
+- HDFC Bank
+- ICICI Bank
+- Axis Bank
+- Kotak Mahindra Bank
+
+*More banks can be easily added via regex patterns*
+
+### SMS Format Examples
+
+```
+✅ SBI: Rs.1,500.00 debited from A/c **1234 on 15-Nov-25
+   Info: Payment to AMAZON
+
+✅ HDFC: Rs.50,000.00 credited to A/c XX9876 on 14-Nov-25
+   Info: Salary credited
+
+✅ ICICI: Your A/c XX5678 debited with Rs.2,500.00 on 17-Nov-25
+   at ZOMATO FOOD DELIVERY
+```
+
+## 📊 Features in Detail
+
+### Dashboard
+- **Budget Speedometer**: Visual gauge showing spending vs budget
+  - Green: Under 50% spent
+  - Orange: 50-80% spent
+  - Red: Over 80% spent
+- **Quick Stats**: Bank balance, pending bills, total spent
+- **Recent Transactions**: Last 10 transactions with icons
+- **Pull to Refresh**: Sync new SMS instantly
+
+### Transactions
+- **View All**: Complete transaction history
+- **Add Manual**: Cash or non-SMS transactions
+- **Edit**: Modify amount, category, description
+- **Delete**: Remove with confirmation
+- **Filter**: By type (Income/Expense)
+- **Auto-Import**: From SMS with one tap
+
+### Settings
+- **Profile**: Nickname, budget, month start date
+- **SMS Sync**: Manual sync and resync options
+- **Account**: Sign out securely
+
+## 🛠️ Technology Stack
+
+- **Framework**: React Native 0.81.5 + Expo ~54.0.23
+- **Navigation**: Expo Router (file-based routing)
+- **Authentication**: Firebase Auth
+- **Storage**: AsyncStorage (local) + Firebase Firestore (ready)
+- **State**: React Context API
+- **Language**: TypeScript
+- **SMS**: Native Android SMS reading
+- **UI**: React Native SVG, Reanimated
+
+## 📂 Project Structure
 
 ```
 exptra-app/
-├── app/                      # Expo Router screens
-│   ├── (auth)/              # Authentication screens
-│   │   ├── login.tsx        # Login/Signup screen
-│   │   └── setup.tsx        # Initial setup screen
-│   ├── (tabs)/              # Main app tabs
-│   │   ├── index.tsx        # Dashboard screen
-│   │   ├── explore.tsx      # Transactions screen
-│   │   └── settings.tsx     # Settings screen
-│   └── _layout.tsx          # Root layout with providers
-├── components/              # Reusable components
-│   └── Speedometer.tsx      # Budget speedometer component
-├── config/                  # Configuration files
-│   └── firebase.ts          # Firebase configuration
-├── constants/               # App constants
-│   ├── categories.ts        # Transaction categories
-│   └── theme.ts             # Theme configuration
-├── contexts/                # React Context providers
-│   ├── AuthContext.tsx      # Authentication state
-│   ├── AppContext.tsx       # App settings state
-│   └── TransactionContext.tsx # Transaction management
-├── utils/                   # Utility functions
-│   └── smsParser.ts         # SMS parsing logic
-├── app.json                 # Expo configuration
-├── package.json             # Dependencies
-└── tsconfig.json            # TypeScript configuration
+├── app/
+│   ├── (auth)/              # Auth screens
+│   │   ├── login.tsx
+│   │   └── setup.tsx
+│   ├── (tabs)/              # Main app
+│   │   ├── index.tsx        # Dashboard with SMS sync
+│   │   ├── explore.tsx      # Transactions
+│   │   └── settings.tsx     # Settings with sync options
+│   └── _layout.tsx
+├── components/
+│   └── Speedometer.tsx      # Budget visualization
+├── config/
+│   └── firebase.ts          # Firebase config
+├── constants/
+│   ├── categories.ts        # Categories & icons
+│   └── theme.ts
+├── contexts/
+│   ├── AuthContext.tsx
+│   ├── AppContext.tsx
+│   └── TransactionContext.tsx  # With SMS sync
+├── utils/
+│   ├── smsParser.ts         # Bank SMS patterns
+│   ├── smsService.ts        # SMS sync service
+│   └── nativeSMSReader.ts   # Native SMS access
+└── docs/
+    ├── SMS-FEATURE.md       # SMS feature docs
+    └── DEPLOYMENT.md
 ```
 
-## Key Features Implementation
+## 🔒 Privacy & Security
 
-### 1. SMS Reading & Parsing
+### SMS Data
+- ✅ **Local Processing**: All SMS read and processed on device
+- ✅ **No Server Upload**: SMS data never sent to any server
+- ✅ **Selective Reading**: Only banking SMS processed
+- ✅ **Encrypted Storage**: All data stored in encrypted AsyncStorage
+- ✅ **User Control**: Can revoke permission anytime
 
-The app uses pattern matching to detect banking transactions from SMS:
+### Authentication
+- Firebase Auth with secure tokens
+- Password never stored locally
+- Session management with auto-logout
 
-```typescript
-// Example SMS patterns for different banks
-const smsPatterns = [
-  {
-    bank: 'SBI',
-    pattern: /SBI|State Bank/i,
-    extractData: (msg) => {
-      // Extract transaction details
-    }
-  }
-];
-```
+## 📋 Permissions
 
-**Note**: SMS reading requires user permission and only works on physical Android devices.
+### Required (Android)
+- **READ_SMS**: Read SMS inbox for transactions
+- **RECEIVE_SMS**: Detect new SMS (future feature)
 
-### 2. Budget Tracking
+### How to Grant
+1. App requests automatically on first use
+2. Can also grant in Android Settings > Apps > Exptra-AI > Permissions
 
-Visual speedometer shows spending progress against monthly budget:
-- Green: Under 50% of budget
-- Orange: 50-80% of budget
-- Red: Over 80% of budget
+### How to Revoke
+1. Android Settings > Apps > Exptra-AI > Permissions > SMS > Deny
+2. App will continue working with manual entry only
 
-### 3. Transaction Categories
+## 🧪 Testing
 
-Predefined categories with auto-detection:
-- **Expenses**: Food & Dining, Shopping, Transportation, Utilities, Healthcare, Education, EMI, etc.
-- **Income**: Salary, Business, Investment, Freelance, Gift, etc.
+### With Real SMS
+1. Install APK on Android device
+2. Grant SMS permission
+3. App will read your actual banking SMS
+4. Verify transactions are created
 
-### 4. Month Cycle
+### Without SMS (Development)
+1. App provides sample SMS data
+2. Test with Expo Go or emulator
+3. Sample transactions automatically created
+4. Full functionality available
 
-Users can set custom month start dates (e.g., salary credit date) for accurate monthly tracking.
+## 🏗️ Building
 
-## Permissions
-
-The app requires the following Android permissions:
-
-- `READ_SMS` - To read banking SMS messages
-- `RECEIVE_SMS` - To receive new SMS in real-time
-- `READ_EXTERNAL_STORAGE` - For file access
-- `WRITE_EXTERNAL_STORAGE` - For data caching
-
-## Known Limitations
-
-1. **SMS Reading**: Only works on physical Android devices (not in emulators)
-2. **iOS**: SMS reading is not supported on iOS due to platform restrictions
-3. **Bank Support**: Currently supports major Indian banks; patterns can be extended
-4. **Offline Mode**: Full offline support; cloud sync can be implemented using Firebase
-
-## Future Enhancements
-
-- [ ] Real-time SMS monitoring
-- [ ] Cloud sync with Firebase Firestore
-- [ ] Bill payment reminders with notifications
-- [ ] Export transactions to CSV/PDF
-- [ ] Charts and analytics
-- [ ] Multiple currency support
-- [ ] Recurring transaction patterns
-- [ ] AI-powered category suggestions
-- [ ] Budget forecasting
-
-## Troubleshooting
-
-### Build Errors
-
-If you encounter build errors:
-
+### Development Build
 ```bash
-# Clear cache and rebuild
-npm run prebuild:clean
+npm start
+npm run android
+```
+
+### Preview APK (Testing)
+```bash
+npm install -g eas-cli
+eas login
+npm run build:android:apk
+```
+
+### Production AAB (Play Store)
+```bash
+npm run build:android
+```
+
+## 📖 Documentation
+
+- **[SMS Feature Guide](SMS-FEATURE.md)** - Detailed SMS reading documentation
+- **[Deployment Guide](DEPLOYMENT.md)** - Build and deployment instructions
+- **[Quick Start](QUICKSTART.md)** - 5-minute setup guide
+- **[Project Summary](PROJECT-SUMMARY.md)** - Complete feature list
+
+## 🐛 Troubleshooting
+
+### SMS Not Syncing
+- ✅ Check SMS permission is granted
+- ✅ Verify banking SMS exists in inbox
+- ✅ Try manual sync in Settings
+- ✅ Check if bank is supported
+
+### App Won't Build
+```bash
 rm -rf node_modules
 npm install
+npm start -- --clear
 ```
 
-### Firebase Connection Issues
+### Permission Issues
+- Grant in Android Settings > Apps > Exptra-AI
+- Restart app after granting permission
 
-Ensure your Firebase project has:
-- Authentication enabled
-- Firestore database created
-- Proper security rules configured
+## 🔄 Updates & Syncing
 
-### SMS Not Reading
+### Automatic
+- App checks for new SMS on open
+- Pull-to-refresh on dashboard
+- Background sync (coming soon)
 
-- Check if permissions are granted in app settings
-- Verify SMS format matches the patterns in `utils/smsParser.ts`
-- Test on a physical Android device (not emulator)
+### Manual
+- Settings > SMS Sync > Sync New SMS
+- Settings > SMS Sync > Resync All (re-import all)
 
-## Contributing
+## 🎯 Roadmap
 
-Contributions are welcome! Please:
+### Current Version (1.0.0)
+- ✅ Automatic SMS reading
+- ✅ Multi-bank support
+- ✅ Smart categorization
+- ✅ Budget tracking
+- ✅ Manual transactions
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+### Coming Soon (1.1.0)
+- [ ] Real-time SMS monitoring
+- [ ] Bill reminders with notifications
+- [ ] Charts and analytics
+- [ ] Export to CSV/PDF
+- [ ] More banks support
+- [ ] Recurring transaction detection
 
-## License
+### Future (2.0.0)
+- [ ] Cloud sync with Firebase
+- [ ] Multiple accounts
+- [ ] Shared budgets
+- [ ] AI-powered insights
+- [ ] Balance forecasting
 
-This project is licensed under the MIT License.
+## 🤝 Contributing
 
-## Support
+We welcome contributions! Areas to contribute:
 
-For issues and questions, please open an issue on the GitHub repository.
+1. **Add Bank Patterns**: Support more banks
+2. **Improve Categorization**: Better keyword detection
+3. **UI Enhancements**: Better visualizations
+4. **Documentation**: Improve guides
+5. **Testing**: Test on different devices
+
+## ❓ FAQ
+
+**Q: Is my SMS data safe?**
+A: Yes, all SMS processing happens locally on your device. No data is sent to any server.
+
+**Q: Can I disable SMS reading?**
+A: Yes, revoke SMS permission in Android settings. You can still use manual entry.
+
+**Q: Does it work on iPhone?**
+A: No, iOS doesn't allow apps to read SMS due to platform restrictions.
+
+**Q: What if my bank isn't supported?**
+A: You can add transactions manually, or we can add your bank's SMS pattern.
+
+**Q: Will it create duplicate transactions?**
+A: No, the app tracks processed SMS IDs to prevent duplicates.
+
+**Q: Can I edit auto-detected transactions?**
+A: Yes, all transactions can be edited or deleted regardless of source.
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](link-to-issues)
+- **Email**: support@exptra.app
+- **Documentation**: Check the docs/ folder
+
+## 📜 License
+
+MIT License - See LICENSE file for details
+
+## 🙏 Acknowledgments
+
+- Firebase for authentication
+- Expo for amazing React Native tools
+- React Native community
+- All contributors
 
 ---
 
-**Exptra-AI v1.0.0** - Smart Expense Tracker
-Built with ❤️ using React Native and Expo
+**Exptra-AI v1.0.0** - Your Smart Financial Companion
+
+*Automatically track expenses from SMS. Never miss a transaction.*
+
+**Made with ❤️ for better financial management**

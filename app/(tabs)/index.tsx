@@ -7,18 +7,74 @@ import {
   TouchableOpacity,
   FlatList,
   RefreshControl,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useApp } from '../../contexts/AppContext';
 import { useTransactions, Transaction } from '../../contexts/TransactionContext';
 import Speedometer from '../../components/Speedometer';
 import { CATEGORY_ICONS } from '../../constants/categories';
+import SMSService from '../../utils/smsService';
 
 export default function DashboardScreen() {
-  const { settings } = useApp();
-  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, bills } = useTransactions();
+  const { settings, updateSettings } = useApp();
+  const { 
+    getMonthlyTransactions, 
+    getTotalExpense, 
+    getTotalIncome, 
+    bills,
+    syncSMSTransactions 
+  } = useTransactions();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // Initial SMS sync on first load
+  useEffect(() => {
+    const performInitialSync = async () => {
+      if (!settings.isInitialSMSSyncComplete) {
+        const hasPermission = await SMSService.checkSMSPermission();
+        if (!hasPermission) {
+          const granted = await SMSService.requestSMSPermission();
+          if (granted) {
+            await syncSMS(true);
+          }
+        } else {
+          await syncSMS(true);
+        }
+      }
+    };
+
+    performInitialSync();
+  }, [settings.isInitialSMSSyncComplete]);
+
+  const syncSMS = async (isInitial: boolean = false) => {
+    setSyncing(true);
+    try {
+      const count = await syncSMSTransactions(isInitial);
+      
+      if (isInitial && count > 0) {
+        await updateSettings({ isInitialSMSSyncComplete: true });
+        Alert.alert(
+          'SMS Sync Complete',
+          `Successfully imported ${count} transactions from your SMS messages.`,
+          [{ text: 'OK' }]
+        );
+      } else if (!isInitial && count > 0) {
+        Alert.alert(
+          'New Transactions',
+          `Found ${count} new transactions from SMS.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error syncing SMS:', error);
+      Alert.alert('Sync Error', 'Failed to sync SMS messages. Please try again.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
   const totalExpense = getTotalExpense(selectedYear, selectedMonth);
@@ -30,7 +86,8 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await syncSMS(false); // Sync new SMS on refresh
+    setRefreshing(false);
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
@@ -62,8 +119,16 @@ export default function DashboardScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {settings.nickname || 'User'}! 👋</Text>
-        <Text style={styles.subtitle}>Here's your expense overview</Text>
+        <View>
+          <Text style={styles.greeting}>Hello, {settings.nickname || 'User'}! 👋</Text>
+          <Text style={styles.subtitle}>Here's your expense overview</Text>
+        </View>
+        {syncing && (
+          <View style={styles.syncIndicator}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.syncText}>Syncing...</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.speedometerContainer}>
@@ -137,6 +202,9 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#2196F3',
     paddingTop: 60,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   greeting: {
     fontSize: 28,
@@ -147,6 +215,19 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#E3F2FD',
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  syncText: {
+    color: '#fff',
+    fontSize: 12,
+    marginLeft: 6,
   },
   speedometerContainer: {
     backgroundColor: '#fff',
