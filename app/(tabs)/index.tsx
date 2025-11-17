@@ -1,98 +1,304 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
+  RefreshControl,
+} from 'react-native';
+import { useApp } from '../../contexts/AppContext';
+import { useTransactions, Transaction } from '../../contexts/TransactionContext';
+import Speedometer from '../../components/Speedometer';
+import { CATEGORY_ICONS } from '../../constants/categories';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function DashboardScreen() {
+  const { settings } = useApp();
+  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, bills } = useTransactions();
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [refreshing, setRefreshing] = useState(false);
 
-export default function HomeScreen() {
+  const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
+  const totalExpense = getTotalExpense(selectedYear, selectedMonth);
+  const totalIncome = getTotalIncome(selectedYear, selectedMonth);
+  const remainingBudget = Math.max(settings.monthlyBudget - totalExpense, 0);
+  
+  const pendingBills = bills.reduce((sum, bill) => sum + bill.amount, 0);
+  const bankBalance = 0;
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
+  const renderTransaction = ({ item }: { item: Transaction }) => (
+    <View style={styles.transactionItem}>
+      <View style={styles.transactionIcon}>
+        <Text style={styles.iconText}>{CATEGORY_ICONS[item.category]}</Text>
+      </View>
+      <View style={styles.transactionDetails}>
+        <Text style={styles.transactionCategory}>{item.category}</Text>
+        <Text style={styles.transactionAccount}>{item.bankName} • {item.account}</Text>
+        <Text style={styles.transactionDate}>
+          {new Date(item.date).toLocaleDateString()}
+        </Text>
+      </View>
+      <Text style={[
+        styles.transactionAmount,
+        item.type === 'income' ? styles.incomeAmount : styles.expenseAmount
+      ]}>
+        {item.type === 'income' ? '+' : '-'}₹{item.amount.toLocaleString()}
+      </Text>
+    </View>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      <View style={styles.header}>
+        <Text style={styles.greeting}>Hello, {settings.nickname || 'User'}! 👋</Text>
+        <Text style={styles.subtitle}>Here's your expense overview</Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.speedometerContainer}>
+        <Text style={styles.sectionTitle}>Remaining Budget</Text>
+        <Speedometer value={totalExpense} maxValue={settings.monthlyBudget || 1} />
+        <Text style={styles.remainingText}>
+          ₹{remainingBudget.toLocaleString()} remaining
+        </Text>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Bank Balance</Text>
+          <Text style={styles.statValue}>₹****</Text>
+          <Text style={styles.statHint}>Tap to reveal</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Pending Bills</Text>
+          <Text style={styles.statValue}>₹{pendingBills.toLocaleString()}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Total Spent</Text>
+          <Text style={styles.statValue}>₹{totalExpense.toLocaleString()}</Text>
+        </View>
+      </View>
+
+      <View style={styles.transactionsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <TouchableOpacity>
+            <Text style={styles.viewAll}>View All</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.transactionTabs}>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>Income</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab}>
+            <Text style={styles.tabText}>Expense</Text>
+          </TouchableOpacity>
+        </View>
+
+        {monthlyTransactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No transactions yet</Text>
+            <Text style={styles.emptySubtext}>Transactions will appear here</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={monthlyTransactions.slice(0, 10)}
+            renderItem={renderTransaction}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+          />
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    padding: 20,
+    backgroundColor: '#2196F3',
+    paddingTop: 60,
+  },
+  greeting: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#E3F2FD',
+  },
+  speedometerContainer: {
+    backgroundColor: '#fff',
+    margin: 15,
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  remainingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 10,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 15,
+    gap: 10,
+    marginBottom: 15,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 5,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statHint: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 3,
+  },
+  transactionsSection: {
+    backgroundColor: '#fff',
+    margin: 15,
+    padding: 15,
+    borderRadius: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  viewAll: {
+    color: '#2196F3',
+    fontSize: 14,
+  },
+  transactionTabs: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    gap: 10,
+  },
+  tab: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  transactionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  iconText: {
+    fontSize: 24,
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionCategory: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  transactionAccount: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  transactionDate: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 2,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  incomeAmount: {
+    color: '#4CAF50',
+  },
+  expenseAmount: {
+    color: '#F44336',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
   },
 });
+
