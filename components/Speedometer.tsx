@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Circle, Text as SvgText } from 'react-native-svg';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
 
 interface SpeedometerProps {
   value: number;
@@ -8,7 +8,7 @@ interface SpeedometerProps {
   size?: number;
 }
 
-export default function Speedometer({ value, maxValue, size = 200 }: SpeedometerProps) {
+export default function Speedometer({ value, maxValue, size = 400 }: SpeedometerProps) {
   const percentage = Math.min(Math.max((value / maxValue) * 100, 0), 100);
   const angle = (percentage / 100) * 180;
   
@@ -62,7 +62,7 @@ export default function Speedometer({ value, maxValue, size = 200 }: Speedometer
         <Circle
           cx={centerX}
           cy={centerY}
-          r={size * 0.03}
+          r={size * 0.04}
           fill="#333"
         />
         

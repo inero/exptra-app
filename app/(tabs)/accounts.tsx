@@ -1,18 +1,18 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  Alert,
   FlatList,
   Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Alert,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useAccounts, Account } from '../../contexts/AccountContext';
+import { Account, useAccounts } from '../../contexts/AccountContext';
 import { useTransactions } from '../../contexts/TransactionContext';
-import { useRouter } from 'expo-router';
 
 export default function AccountsScreen() {
   const { accounts, addAccount, updateAccount, deleteAccount, getTotalBalance } = useAccounts();
@@ -55,7 +55,7 @@ export default function AccountsScreen() {
       type: account.type,
       accountNumber: account.accountNumber || '',
       bankName: account.bankName || '',
-      balance: account.balance.toString(),
+      balance: account.balance >= 0 ? account.balance.toString() : "0",
     });
     setModalVisible(true);
   };
@@ -142,7 +142,7 @@ export default function AccountsScreen() {
                 <Text style={styles.bankName}>{item.bankName}</Text>
               )}
             </View>
-            <Text style={styles.accountBalance}>₹{item.balance.toLocaleString()}</Text>
+            <Text style={styles.accountBalance}>₹{item.balance >= 0 ? item.balance.toLocaleString() : "0"}</Text>
           </View>
           
           <View style={styles.accountStats}>

@@ -1,17 +1,18 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -81,11 +82,12 @@ export default function LoginScreen() {
     >
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
+          {/* <View style={styles.logo}>
             <Text style={styles.logoText}>💰</Text>
           </View>
-          <Text style={styles.title}>Exptra-AI</Text>
-          <Text style={styles.subtitle}>Smart Expense Tracker</Text>
+          <Text style={styles.title}>Exptra</Text>
+          <Text style={styles.subtitle}>Smart Expense Tracker</Text> */}
+          <Image source={require('../../assets/images/exptra-logo.png')} style={{ width: 180, height: 180 }} />
         </View>
 
         <View style={styles.formContainer}>

@@ -1,17 +1,16 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
   Alert,
-  Switch,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const { settings, updateSettings } = useApp();
@@ -124,7 +123,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Exptra-AI v1.0.0</Text>
+        <Text style={styles.footerText}>Exptra v1.0.0</Text>
         <Text style={styles.footerSubtext}>Smart Expense Tracker</Text>
       </View>
     </ScrollView>

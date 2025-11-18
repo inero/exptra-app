@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  Alert,
   FlatList,
   Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  Alert,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useTransactions, Bill } from '../../contexts/TransactionContext';
 import { useAccounts } from '../../contexts/AccountContext';
+import { Bill, useTransactions } from '../../contexts/TransactionContext';
 
 export default function BillsScreen() {
   const { bills, addBill, updateBill, deleteBill, markBillAsPaid, getPendingBills, getOverdueBills } = useTransactions();
@@ -63,7 +63,7 @@ export default function BillsScreen() {
       reminderDate: bill.reminderDate.toString(),
       frequency: bill.frequency,
       isEMI: bill.isEMI,
-      emiTenure: bill.emiTenure?.toString() || '',
+      emiTenure: bill.emiTenure?.toString() || '360',
     });
     setModalVisible(true);
   };
@@ -112,17 +112,18 @@ export default function BillsScreen() {
   };
 
   const handleMarkAsPaid = (bill: Bill) => {
-    Alert.alert(
-      'Mark as Paid',
-      `Mark ${bill.name} as paid?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => markBillAsPaid(bill.id),
-        },
-      ]
-    );
+    markBillAsPaid(bill.id);
+    // Alert.alert(
+    //   'Mark as Paid',
+    //   `Mark ${bill.name} as paid?`,
+    //   [
+    //     { text: 'Cancel', style: 'cancel' },
+    //     {
+    //       text: 'Confirm',
+    //       onPress: () => markBillAsPaid(bill.id),
+    //     },
+    //   ]
+    // );
   };
 
   const handleDelete = (id: string) => {

@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   FlatList,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useApp } from '../../contexts/AppContext';
-import { useTransactions, Transaction } from '../../contexts/TransactionContext';
-import { useAccounts } from '../../contexts/AccountContext';
 import Speedometer from '../../components/Speedometer';
 import { CATEGORY_ICONS } from '../../constants/categories';
-import { useRouter } from 'expo-router';
+import { useAccounts } from '../../contexts/AccountContext';
+import { useApp } from '../../contexts/AppContext';
+import { Transaction, useTransactions } from '../../contexts/TransactionContext';
 
 export default function DashboardScreen() {
   const { settings } = useApp();
@@ -24,6 +24,7 @@ export default function DashboardScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [showAmounts, setShowAmounts] = useState(true);
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
   const filteredTransactions = monthlyTransactions.filter(t => {
@@ -36,12 +37,51 @@ export default function DashboardScreen() {
   
   const pendingBills = getPendingBills(selectedYear, selectedMonth);
   const overdueBills = getOverdueBills();
-  const totalPendingAmount = [...pendingBills, ...overdueBills].reduce((sum, bill) => sum + bill.amount, 0);
+  // Calculate total only for unpaid overdue bills and unpaid EMIs, avoiding double-counting
+  const totalPendingAmount = (() => {
+    const unique = new Map<any, any>();
+
+    const isPaid = (bill: any) => {
+      if (!bill) return false;
+      if (typeof bill.paid === 'boolean') return bill.paid === true;
+      if (typeof bill.status === 'string') return bill.status.toLowerCase() === 'paid';
+      return false;
+    };
+
+    // Add unpaid overdue bills
+    (overdueBills || []).forEach((bill: any) => {
+      if (bill && !isPaid(bill)) {
+        const key = bill && 'id' in bill && bill.id != null ? bill.id : JSON.stringify(bill);
+        if (!unique.has(key)) unique.set(key, bill);
+      }
+    });
+
+    // Add unpaid EMIs from pending bills
+    (pendingBills || []).forEach((bill: any) => {
+      const isEmi = bill && (bill.type === 'emi' || bill.isEmi === true || (typeof bill.category === 'string' && bill.category.toLowerCase() === 'emi'));
+      if (isEmi && !isPaid(bill)) {
+        const key = bill && 'id' in bill && bill.id != null ? bill.id : JSON.stringify(bill);
+        if (!unique.has(key)) unique.set(key, bill);
+      }
+    });
+
+    return Array.from(unique.values()).reduce((sum: number, bill: any) => sum + (bill.amount ?? 0), 0);
+  })();
   const bankBalance = getTotalBalance();
 
   const onRefresh = async () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
+  };
+
+  const getRemainingDaysInMonth = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const remainingDays = lastDay - today.getDate();
+    
+    return remainingDays;
   };
 
   const renderTransaction = ({ item }: { item: Transaction }) => (
@@ -75,15 +115,17 @@ export default function DashboardScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, {settings.nickname || 'User'}! 👋</Text>
+        <Text style={styles.greeting}>Hello, {settings.nickname || 'User'}</Text>
         <Text style={styles.subtitle}>Here's your expense overview</Text>
       </View>
 
       <View style={styles.speedometerContainer}>
-        <Text style={styles.sectionTitle}>Remaining Budget</Text>
+        <Text style={styles.sectionTitle}>
+          {new Date(selectedYear, selectedMonth).toLocaleString(undefined, { month: 'long', year: 'numeric' })}
+        </Text>
         <Speedometer value={totalExpense} maxValue={settings.monthlyBudget || 1} />
         <Text style={styles.remainingText}>
-          ₹{remainingBudget.toLocaleString()} remaining
+          {remainingBudget <= 0 ? 'Budget exceeded' : `Safe to spend ₹${remainingBudget.toLocaleString()}`} | {getRemainingDaysInMonth()} days left
         </Text>
       </View>
 
@@ -93,7 +135,9 @@ export default function DashboardScreen() {
           onPress={() => router.push('/accounts' as any)}
         >
           <Text style={styles.statLabel}>Bank Balance</Text>
-          <Text style={styles.statValue}>₹{bankBalance.toLocaleString()}</Text>
+          <TouchableOpacity onPress={() => setShowAmounts(!showAmounts)} >
+              {showAmounts ? <Text style={styles.statValue}>₹ *** ***</Text> : <Text style={styles.statValue}>₹ {bankBalance.toLocaleString()}</Text>}
+          </TouchableOpacity>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.statCard}
@@ -181,7 +225,7 @@ const styles = StyleSheet.create({
   speedometerContainer: {
     backgroundColor: '#fff',
     margin: 15,
-    padding: 20,
+    padding: 15,
     borderRadius: 15,
     alignItems: 'center',
     elevation: 3,
@@ -194,12 +238,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
   },
   remainingText: {
     fontSize: 16,
     color: '#666',
-    marginTop: 10,
   },
   statsContainer: {
     flexDirection: 'row',

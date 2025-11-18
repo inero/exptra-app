@@ -1,17 +1,17 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ScrollView,
+  View,
 } from 'react-native';
 import { useApp } from '../../contexts/AppContext';
-import { useRouter } from 'expo-router';
 
 export default function InitialSetupScreen() {
   const [nickname, setNickname] = useState('');
@@ -73,7 +73,7 @@ export default function InitialSetupScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome to Exptra-AI! 🎉</Text>
+          <Text style={styles.title}>Welcome to Exptra! 🎉</Text>
           <Text style={styles.subtitle}>Let's set up your profile</Text>
 
           <View style={styles.formContainer}>

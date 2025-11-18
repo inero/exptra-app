@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 
@@ -304,7 +304,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
     if (bill.isEMI && bill.emiPaid !== undefined && bill.emiTenure) {
       updates.emiPaid = bill.emiPaid + 1;
-      if (updates.emiPaid >= bill.emiTenure) {
+      console.log('updates to:', updates);
+      console.log('bill to:', bill);
+      console.log('updates lastPaidDate to:', updates.lastPaidDate?.getMonth());
+      console.log('getMonth to:', new Date().getMonth());
+      if ((updates.emiPaid <= bill.emiTenure) && (updates.lastPaidDate?.getMonth() === new Date().getMonth())) {
         // EMI completed, keep as paid
       } else {
         // More installments remaining
