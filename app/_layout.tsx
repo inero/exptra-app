@@ -1,14 +1,13 @@
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
-import { useEffect } from 'react';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import { AppProvider, useApp } from '../contexts/AppContext';
-import { TransactionProvider } from '../contexts/TransactionContext';
 import { AccountProvider } from '../contexts/AccountContext';
+import { AppProvider, useApp } from '../contexts/AppContext';
+import { AuthProvider, getToken, isTrueString, useAuth } from '../contexts/AuthContext';
+import { TransactionProvider } from '../contexts/TransactionContext';
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -16,6 +15,7 @@ function RootLayoutNav() {
   const { settings, loading: settingsLoading } = useApp();
   const segments = useSegments();
   const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     if (authLoading || settingsLoading) return;
@@ -25,13 +25,23 @@ function RootLayoutNav() {
 
     console.log('Navigation check:', { user: !!user, inAuthGroup, inTabsGroup, setupComplete: settings.isInitialSetupComplete });
 
-    if (!user && !inAuthGroup) {
+    const checkLogin = async () => {
+      const token = await getToken("userToken");
+      if (token && isTrueString(token)) {
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+      }
+    }
+    checkLogin();
+
+    if (!user && !inAuthGroup && !isLoggedIn) {
       console.log('Redirecting to login');
       router.replace('/(auth)/login');
-    } else if (user && !settings.isInitialSetupComplete && !inAuthGroup) {
+    } else if (user && !settings.isInitialSetupComplete && !inAuthGroup && isLoggedIn) {
       console.log('Redirecting to setup');
       router.replace('/(auth)/setup');
-    } else if (user && settings.isInitialSetupComplete && !inTabsGroup) {
+    } else if (user && settings.isInitialSetupComplete && !inTabsGroup && isLoggedIn) {
       console.log('Redirecting to tabs');
       router.replace('/(tabs)');
     }

@@ -1,14 +1,15 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { 
-  signInWithEmailAndPassword, 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
   User
 } from 'firebase/auth';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { auth } from '../config/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isNetworkError, getNetworkErrorMessage } from '../utils/networkUtils';
+import { getNetworkErrorMessage, isNetworkError } from '../utils/networkUtils';
 
 interface AuthContextType {
   user: User | null;
@@ -117,3 +118,22 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Save token
+export const saveToken = async (key: any, value: any) => {
+  await SecureStore.setItemAsync(key, value);
+}
+
+// Get token
+export const getToken = async (key: any) => {
+  return await SecureStore.getItemAsync(key);
+}
+
+// Delete token
+export const deleteToken = async (key: any) => {
+  await SecureStore.deleteItemAsync(key);
+};
+
+export const isTrueString = (str: any) => {
+  return typeof str === "string" && str.trim().toLowerCase() === "true";
+}

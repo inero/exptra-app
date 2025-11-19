@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
+import { deleteToken, getToken, isTrueString, saveToken, useAuth } from '../../contexts/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -65,10 +65,19 @@ export default function LoginScreen() {
         await signUp(email, password);
         Alert.alert('Success', 'Account created successfully! Please log in.');
         setIsSignUp(false);
+        deleteToken("userToken");
       } else {
         await signIn(email, password);
+        const token = await getToken("userToken");
+        if (token && isTrueString(token)) {
+          router.replace('/(tabs)');
+        } else {
+          saveToken("userToken", "true");
+          router.replace('/(auth)/setup');
+        }
       }
     } catch (error: any) {
+      deleteToken("userToken");
       Alert.alert('Authentication Failed', error.message);
     } finally {
       setLoading(false);
