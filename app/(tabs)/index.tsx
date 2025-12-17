@@ -10,9 +10,9 @@ import {
   View
 } from 'react-native';
 import { Card, List, Surface, useTheme } from 'react-native-paper';
+import ImprovedSpeedometer from '../../components/ImprovedSpeedometer';
 import MonthSelector from '../../components/MonthSelector';
 import PieChart from '../../components/PieChart';
-import Speedometer from '../../components/Speedometer';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
@@ -128,14 +128,21 @@ export default function DashboardScreen() {
       />
 
       <Animated.View style={[styles.speedometerContainer, { transform: [{ scale: fadeAnim.interpolate({ inputRange: [0,1], outputRange: [0.98,1] }) }] }] }>
-        <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-          Overview
-        </Text>
-        <Card style={{ backgroundColor: themeColors.surface, width: '100%', elevation: 3 }}>
-          <Card.Content style={{ alignItems: 'center' }}>
-            <Speedometer value={totalExpense} maxValue={settings.monthlyBudget || 1} />
-            <Text style={[styles.remainingText, { color: themeColors.onSurfaceVariant }]}>
-              {remainingBudget <= 0 ? 'Budget exceeded' : `Safe to spend ₹${remainingBudget.toLocaleString()}`} | {getRemainingDaysInMonth()} days left
+        <Card style={{ backgroundColor: themeColors.surface, width: '100%', elevation: 4, borderRadius: 18, overflow: 'hidden' }}>
+          <Card.Content style={{ alignItems: 'center', paddingVertical: 0, paddingHorizontal: 0 }}>
+            <ImprovedSpeedometer 
+              value={totalExpense} 
+              maxValue={settings.monthlyBudget || 1}
+              title="Budget Status"
+              size={300}
+              showAnimation={true}
+              onStatusChange={(status) => {
+                // Optional: Handle status changes
+                console.log('Budget status:', status);
+              }}
+            />
+            <Text style={[styles.remainingText, { color: themeColors.onSurfaceVariant, paddingBottom: 16, paddingHorizontal: 20 }]}>
+              ⏰ {getRemainingDaysInMonth()} days remaining this month
             </Text>
           </Card.Content>
         </Card>
@@ -258,12 +265,12 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: themeColors.primary,
     paddingTop: 60,
+    paddingBottom: 8,
   },
   greeting: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
-    marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,

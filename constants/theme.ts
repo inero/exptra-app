@@ -72,7 +72,7 @@ export const colors = {
   background: '#0b132b',
   surface: '#1c2541',
   card: '#003459',
-  primary: '#00a8e8',
+  primary: '#10B981',
   accent: '#5bc0be',
   text: '#b0c7e4ff',
   muted: '#c5c3c6',
