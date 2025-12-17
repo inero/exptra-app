@@ -19,6 +19,14 @@ export interface Transaction {
   billId?: string; // Link to bill if this transaction is a bill payment
 }
 
+export interface PaymentRecord {
+  paidAt: Date;
+  amount: number;
+  year: number;
+  month: number;
+  transactionId?: string;
+}
+
 export interface Bill {
   id: string;
   name: string;
@@ -33,6 +41,7 @@ export interface Bill {
   emiPaid?: number; // Number of installments paid
   status: 'pending' | 'paid' | 'overdue';
   lastPaidDate?: Date;
+  payments?: PaymentRecord[];
   createdAt: Date;
 }
 
@@ -106,7 +115,11 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         const billsWithDates = data.bills.map((b: any) => ({
           ...b,
           createdAt: b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt),
-          lastPaidDate: b.lastPaidDate?.toDate ? b.lastPaidDate.toDate() : (b.lastPaidDate ? new Date(b.lastPaidDate) : undefined)
+          lastPaidDate: b.lastPaidDate?.toDate ? b.lastPaidDate.toDate() : (b.lastPaidDate ? new Date(b.lastPaidDate) : undefined),
+          payments: b.payments ? b.payments.map((p: any) => ({
+            ...p,
+            paidAt: p.paidAt?.toDate ? p.paidAt.toDate() : new Date(p.paidAt)
+          })) : undefined,
         }));
         setBills(billsWithDates);
         await AsyncStorage.setItem(`bills_${user.uid}`, JSON.stringify(billsWithDates));
@@ -222,6 +235,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         if (bill.emiTenure !== undefined) sanitized.emiTenure = bill.emiTenure;
         if (bill.emiPaid !== undefined) sanitized.emiPaid = bill.emiPaid;
         if (bill.lastPaidDate) sanitized.lastPaidDate = bill.lastPaidDate;
+        if (bill.payments) sanitized.payments = bill.payments.map(p => {
+          const sp: any = {
+            paidAt: p.paidAt,
+            amount: p.amount,
+            year: p.year,
+            month: p.month,
+          };
+          if (p.transactionId !== undefined) sp.transactionId = p.transactionId;
+          return sp;
+        });
         
         return sanitized;
       });
@@ -297,23 +320,32 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     const bill = bills.find(b => b.id === id);
     if (!bill) return;
 
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    const payment = {
+      paidAt: now,
+      amount: bill.amount,
+      year,
+      month,
+    } as PaymentRecord;
+
     const updates: Partial<Bill> = {
-      status: 'paid',
-      lastPaidDate: new Date(),
+      lastPaidDate: now,
+      payments: [...(bill.payments || []), payment],
     };
 
-    if (bill.isEMI && bill.emiPaid !== undefined && bill.emiTenure) {
-      updates.emiPaid = bill.emiPaid + 1;
-      console.log('updates to:', updates);
-      console.log('bill to:', bill);
-      console.log('updates lastPaidDate to:', updates.lastPaidDate?.getMonth());
-      console.log('getMonth to:', new Date().getMonth());
-      if ((updates.emiPaid <= bill.emiTenure) && (updates.lastPaidDate?.getMonth() === new Date().getMonth())) {
-        // EMI completed, keep as paid
-      } else {
-        // More installments remaining
-        updates.status = 'pending';
-      }
+    if (bill.isEMI) {
+      updates.emiPaid = (bill.emiPaid || 0) + 1;
+    }
+
+    // mark as paid for this cycle; re-evaluation for next month is done when listing
+    // For one-time bills set persistent status to paid; for recurring bills keep status pending
+    if (bill.frequency === 'one-time') {
+      updates.status = 'paid';
+    } else {
+      updates.status = 'pending';
     }
 
     await updateBill(id, updates);
@@ -324,8 +356,14 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     const currentDay = today.getDate();
     
     return bills.filter(b => {
-      if (b.status === 'paid' && b.frequency === 'one-time') return false;
-      
+      const hasPaidThisMonth = b.payments?.some(p => p.year === year && p.month === month);
+
+      if (b.frequency === 'one-time') {
+        return b.status === 'pending' && !hasPaidThisMonth;
+      }
+
+      if (hasPaidThisMonth) return false;
+
       // Check if bill is due this month
       const isDueThisMonth = b.dueDate >= 1 && b.dueDate <= 31;
       
@@ -335,8 +373,6 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         return month % 3 === 0 && isDueThisMonth;
       } else if (b.frequency === 'yearly') {
         return month === 0 && isDueThisMonth; // January
-      } else if (b.frequency === 'one-time') {
-        return b.status === 'pending';
       }
       
       return false;
@@ -346,10 +382,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   const getOverdueBills = (): Bill[] => {
     const today = new Date();
     const currentDay = today.getDate();
-    
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
     return bills.filter(b => {
-      if (b.status === 'paid') return false;
-      
+      const hasPaidThisMonth = b.payments?.some(p => p.year === year && p.month === month);
+      if (hasPaidThisMonth) return false;
+
+      // Only consider recurring or pending one-time bills
+      if (b.frequency === 'one-time' && b.status !== 'pending') return false;
+
       // Check if due date has passed this month
       return b.dueDate < currentDay;
     }).map(b => ({ ...b, status: 'overdue' as const }));

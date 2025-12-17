@@ -202,9 +202,9 @@ export default function AccountsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No accounts added yet</Text>
+            <Text style={styles.emptyText}>No account(s)</Text>
             <TouchableOpacity style={styles.emptyButton} onPress={openAddModal}>
-              <Text style={styles.emptyButtonText}>Add Your First Account</Text>
+              <Text style={styles.emptyButtonText}>Add Your Account</Text>
             </TouchableOpacity>
           </View>
         }

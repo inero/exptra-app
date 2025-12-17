@@ -20,6 +20,8 @@ export default function BillsScreen() {
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'overdue'>('all');
   
+  // Dev-only simulated date for testing month changes
+  const [simDate, setSimDate] = useState<Date | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -31,8 +33,17 @@ export default function BillsScreen() {
     emiTenure: '',
   });
 
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const displayDate = simDate || today;
+  const currentMonth = displayDate.getMonth();
+  const currentYear = displayDate.getFullYear();
+
+  const shiftSimMonth = (offset: number) => {
+    setSimDate(prev => {
+      const base = prev || new Date();
+      return new Date(base.getFullYear(), base.getMonth() + offset, 1);
+    });
+  };
 
   const resetForm = () => {
     setFormData({
@@ -169,7 +180,8 @@ export default function BillsScreen() {
 
   const renderBill = ({ item }: { item: Bill }) => {
     const isOverdue = item.status === 'overdue';
-    const isPaid = item.status === 'paid';
+    const hasPaidThisMonth = item.payments?.some(p => p.year === currentYear && p.month === currentMonth);
+    const isPaid = item.frequency === 'one-time' ? item.status === 'paid' : !!hasPaidThisMonth;
     
     return (
       <TouchableOpacity
@@ -207,7 +219,7 @@ export default function BillsScreen() {
             </Text>
           </View>
           
-          {item.status !== 'paid' && (
+          {!isPaid && (
             <TouchableOpacity
               style={styles.payButton}
               onPress={() => handleMarkAsPaid(item)}
@@ -215,7 +227,7 @@ export default function BillsScreen() {
               <Text style={styles.payButtonText}>Mark Paid</Text>
             </TouchableOpacity>
           )}
-          {item.status === 'paid' && (
+          {isPaid && (
             <View style={styles.paidBadge}>
               <Text style={styles.paidBadgeText}>✓ Paid</Text>
             </View>
@@ -235,6 +247,20 @@ export default function BillsScreen() {
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+      {__DEV__ && (
+        <View style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8}}>
+          <TouchableOpacity onPress={() => shiftSimMonth(-1)} style={{paddingHorizontal:12, paddingVertical:6, backgroundColor:'#eee', borderRadius:8}}>
+            <Text>◀ Prev</Text>
+          </TouchableOpacity>
+          <Text style={{marginHorizontal:12}}>Sim: {currentMonth + 1}/{currentYear}</Text>
+          <TouchableOpacity onPress={() => shiftSimMonth(1)} style={{paddingHorizontal:12, paddingVertical:6, backgroundColor:'#eee', borderRadius:8}}>
+            <Text>Next ▶</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSimDate(null)} style={{marginLeft:12, paddingHorizontal:8}}>
+            <Text>Reset</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -270,9 +296,9 @@ export default function BillsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No bills added yet</Text>
+            <Text style={styles.emptyText}>No bill(s)</Text>
             <TouchableOpacity style={styles.emptyButton} onPress={openAddModal}>
-              <Text style={styles.emptyButtonText}>Add Your First Bill</Text>
+              <Text style={styles.emptyButtonText}>Add Your Bill</Text>
             </TouchableOpacity>
           </View>
         }
