@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   FlatList,
@@ -14,7 +14,7 @@ import { useAccounts } from '../../contexts/AccountContext';
 import { Bill, useTransactions } from '../../contexts/TransactionContext';
 
 export default function BillsScreen() {
-  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, getPendingBills, getOverdueBills } = useTransactions();
+  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, undoBillPayment, getPendingBills, getOverdueBills } = useTransactions();
   const { accounts } = useAccounts();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
@@ -32,6 +32,25 @@ export default function BillsScreen() {
     isEMI: false,
     emiTenure: '',
   });
+
+  // Account selection modal state for marking bill as paid
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [billToPay, setBillToPay] = useState<Bill | null>(null);
+  const [chosenAccountId, setChosenAccountId] = useState<string>('');
+
+  // Undo state for recently marked payments
+  const [undoInfo, setUndoInfo] = useState<any>(null);
+  const [undoVisible, setUndoVisible] = useState(false);
+  const undoTimeoutRef = React.useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current as unknown as number);
+        undoTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const today = new Date();
   const displayDate = simDate || today;
@@ -123,18 +142,12 @@ export default function BillsScreen() {
   };
 
   const handleMarkAsPaid = (bill: Bill) => {
-    markBillAsPaid(bill.id);
-    // Alert.alert(
-    //   'Mark as Paid',
-    //   `Mark ${bill.name} as paid?`,
-    //   [
-    //     { text: 'Cancel', style: 'cancel' },
-    //     {
-    //       text: 'Confirm',
-    //       onPress: () => markBillAsPaid(bill.id),
-    //     },
-    //   ]
-    // );
+    // Open account chooser modal so user can select source account for payment
+    setBillToPay(bill);
+    // Prefill chosen account with bill mapping or default account
+    const defaultAccountId = bill.accountId || accounts.find(a => a.isDefault)?.id || accounts[0]?.id || '';
+    setChosenAccountId(defaultAccountId);
+    setAccountModalVisible(true);
   };
 
   const handleDelete = (id: string) => {
@@ -150,6 +163,34 @@ export default function BillsScreen() {
         },
       ]
     );
+  };
+
+  const confirmMarkAsPaid = async () => {
+    if (!billToPay) return;
+    setAccountModalVisible(false);
+    try {
+      const res = await markBillAsPaid(billToPay.id, chosenAccountId || undefined);
+      if (res) {
+        // Show undo banner
+        setUndoInfo(res);
+        setUndoVisible(true);
+        // Clear any existing timeout
+        if (undoTimeoutRef.current) {
+          clearTimeout(undoTimeoutRef.current as unknown as number);
+        }
+        // Auto-hide after 8 seconds
+        undoTimeoutRef.current = setTimeout(() => {
+          setUndoVisible(false);
+          setUndoInfo(null);
+          undoTimeoutRef.current = null;
+        }, 8000) as unknown as number;
+      }
+    } catch (e) {
+      console.error('Error marking bill paid:', e);
+    } finally {
+      setBillToPay(null);
+      setChosenAccountId('');
+    }
   };
 
   const getFilteredBills = (): Bill[] => {
@@ -433,6 +474,55 @@ export default function BillsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Account selector modal for choosing which account to debit */}
+      <Modal visible={accountModalVisible} animationType="slide" transparent={true} onRequestClose={() => setAccountModalVisible(false)}>
+        <View style={{flex:1, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(0,0,0,0.4)'}}>
+          <View style={{width:'90%', backgroundColor:'#fff', borderRadius:12, padding:16}}>
+            <Text style={{fontSize:18, fontWeight:'600', marginBottom:12}}>Select account to debit</Text>
+            <ScrollView style={{maxHeight:240}}>
+              {accounts.map(acc => (
+                <TouchableOpacity key={acc.id} onPress={() => setChosenAccountId(acc.id)} style={{padding:12, borderRadius:8, backgroundColor: chosenAccountId === acc.id ? '#E3F2FD' : 'transparent', marginBottom:8}}>
+                  <Text style={{fontSize:16}}>{acc.name} ({acc.type}) - ₹{acc.balance.toLocaleString()}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={{flexDirection:'row', justifyContent:'flex-end', marginTop:12}}>
+              <TouchableOpacity onPress={() => setAccountModalVisible(false)} style={{padding:10, marginRight:12}}>
+                <Text>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmMarkAsPaid} style={{padding:10, backgroundColor:'#2196F3', borderRadius:8}}>
+                <Text style={{color:'#fff'}}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Undo banner */}
+      {undoVisible && undoInfo && (
+        <View style={{position:'absolute', left:16, right:16, bottom:24, backgroundColor:'#fff', padding:12, borderRadius:8, elevation:4, flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
+          <Text>Marked paid — <Text style={{fontWeight:'600'}}>₹{undoInfo.amount.toLocaleString()}</Text> from account</Text>
+          <View style={{flexDirection:'row'}}>
+            <TouchableOpacity onPress={async () => {
+              try {
+                setUndoVisible(false);
+                await undoBillPayment(undoInfo.transactionId, undoInfo.billId, undoInfo.year, undoInfo.month, undoInfo.accountId, undoInfo.amount);
+              } catch (e) {
+                console.error('Undo failed', e);
+              } finally {
+                setUndoInfo(null);
+                if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current as unknown as number); undoTimeoutRef.current = null; }
+              }
+            }} style={{paddingHorizontal:12, paddingVertical:6}}>
+              <Text style={{color:'#2196F3', fontWeight:'600'}}>Undo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setUndoVisible(false); setUndoInfo(null); if (undoTimeoutRef.current) { clearTimeout(undoTimeoutRef.current as unknown as number); undoTimeoutRef.current = null; }}} style={{paddingHorizontal:12, paddingVertical:6}}>
+              <Text style={{color:'#666'}}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

@@ -29,10 +29,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="accounts"
+        name="bills"
         options={{
-          title: 'Accounts',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={color} />,
+          title: 'Bills',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -43,10 +43,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bills"
+        name="accounts"
         options={{
-          title: 'Bills',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
+          title: 'Accounts',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={color} />,
         }}
       />
       <Tabs.Screen

@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
   Alert,
   FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useTransactions, Transaction } from '../../contexts/TransactionContext';
+import { CATEGORIES, CATEGORY_ICONS } from '../../constants/categories';
 import { useAccounts } from '../../contexts/AccountContext';
 import { useApp } from '../../contexts/AppContext';
-import { CATEGORIES, CATEGORY_ICONS } from '../../constants/categories';
+import { Transaction, useTransactions } from '../../contexts/TransactionContext';
 
 export default function TransactionsScreen() {
   const { transactions, addTransaction, deleteTransaction, updateTransaction } = useTransactions();
@@ -136,7 +136,7 @@ export default function TransactionsScreen() {
       onPress={() => handleEditTransaction(item)}
     >
       <View style={styles.transactionIcon}>
-        <Text style={styles.iconText}>{CATEGORY_ICONS[item.category]}</Text>
+        <Text style={styles.iconText}>{CATEGORY_ICONS[item.category] || '📄'}</Text>
       </View>
       <View style={styles.transactionDetails}>
         <Text style={styles.transactionCategory}>{item.category}</Text>

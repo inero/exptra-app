@@ -41,4 +41,9 @@ export const CATEGORY_ICONS: { [key: string]: string } = {
   'Gift': '🎁',
   'Other': '📝',
   'Uncategorized': '❓',
+  'Electricity' : '⚡',
+  'Water' : '💧',
+  'Internet' : '🌐',
+  'Phone' : '📱',
+  'Subscription' : '📺'
 };

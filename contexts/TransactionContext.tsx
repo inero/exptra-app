@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { db } from '../config/firebase';
+import { useAccounts } from './AccountContext';
 import { useAuth } from './AuthContext';
 
 export interface Transaction {
@@ -48,13 +49,14 @@ export interface Bill {
 interface TransactionContextType {
   transactions: Transaction[];
   bills: Bill[];
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<Transaction>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addBill: (bill: Omit<Bill, 'id' | 'createdAt'>) => Promise<void>;
   updateBill: (id: string, bill: Partial<Bill>) => Promise<void>;
   deleteBill: (id: string) => Promise<void>;
-  markBillAsPaid: (id: string) => Promise<void>;
+  markBillAsPaid: (id: string, accountId?: string) => Promise<{ transactionId: string; billId: string; year: number; month: number; accountId?: string; amount: number } | null>;
+  undoBillPayment: (transactionId: string, billId: string, year: number, month: number, accountId?: string, amount?: number) => Promise<void>;
   getPendingBills: (year: number, month: number) => Bill[];
   getOverdueBills: () => Bill[];
   loadTransactions: () => Promise<void>;
@@ -69,6 +71,7 @@ const TransactionContext = createContext<TransactionContextType | undefined>(und
 
 export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const { accounts, getAccountById, updateAccountBalance } = useAccounts();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
 
@@ -269,7 +272,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+  const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
     const newTransaction: Transaction = {
       ...transaction,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -277,6 +280,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     const newTransactions = [...transactions, newTransaction];
     setTransactions(newTransactions);
     await saveTransactions(newTransactions);
+    return newTransaction;
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
@@ -316,39 +320,110 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     await saveBills(newBills);
   };
 
-  const markBillAsPaid = async (id: string) => {
+  const markBillAsPaid = async (id: string, accountId?: string): Promise<{ transactionId: string; billId: string; year: number; month: number; accountId?: string; amount: number } | null> => {
     const bill = bills.find(b => b.id === id);
-    if (!bill) return;
+    if (!bill) return null;
 
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
 
-    const payment = {
-      paidAt: now,
-      amount: bill.amount,
-      year,
-      month,
-    } as PaymentRecord;
+    // Prevent double-payment for the same month
+    const hasPaidThisMonth = bill.payments?.some(p => p.year === year && p.month === month);
+    if (hasPaidThisMonth) return null;
 
-    const updates: Partial<Bill> = {
-      lastPaidDate: now,
-      payments: [...(bill.payments || []), payment],
-    };
+    // Determine which account to use
+    const targetAccountId = accountId || bill.accountId || accounts.find(a => a.isDefault)?.id || accounts[0]?.id || '';
+    const account = targetAccountId ? getAccountById(targetAccountId) : undefined;
 
-    if (bill.isEMI) {
-      updates.emiPaid = (bill.emiPaid || 0) + 1;
+    try {
+      // First create transaction so we can link it to the bill payment
+      const newTransPayload: Omit<Transaction, 'id'> = {
+        type: 'expense',
+        amount: bill.amount,
+        category: bill.category,
+        accountId: targetAccountId,
+        accountName: account?.name || '',
+        bankName: account?.bankName || '',
+        description: `Bill payment: ${bill.name}`,
+        date: now,
+        isManual: false,
+        billId: bill.id,
+      };
+
+      const createdTrans = await addTransaction(newTransPayload);
+
+      if (targetAccountId) {
+        await updateAccountBalance(targetAccountId, bill.amount, 'subtract');
+      }
+
+      // Now update bill with payment record including transactionId
+      const payment: PaymentRecord = {
+        paidAt: now,
+        amount: bill.amount,
+        year,
+        month,
+        transactionId: createdTrans.id,
+      } as PaymentRecord;
+
+      const updates: Partial<Bill> = {
+        lastPaidDate: now,
+        payments: [...(bill.payments || []), payment],
+      };
+
+      if (bill.isEMI) {
+        updates.emiPaid = (bill.emiPaid || 0) + 1;
+      }
+
+      if (bill.frequency === 'one-time') {
+        updates.status = 'paid';
+      } else {
+        updates.status = 'pending';
+      }
+
+      await updateBill(id, updates);
+
+      return { transactionId: createdTrans.id, billId: id, year, month, accountId: targetAccountId || undefined, amount: bill.amount };
+    } catch (e) {
+      console.error('Error creating transaction for bill payment:', e);
+      return null;
     }
+  };
 
-    // mark as paid for this cycle; re-evaluation for next month is done when listing
-    // For one-time bills set persistent status to paid; for recurring bills keep status pending
-    if (bill.frequency === 'one-time') {
-      updates.status = 'paid';
-    } else {
-      updates.status = 'pending';
+  const undoBillPayment = async (transactionId: string, billId: string, year: number, month: number, accountId?: string, amount?: number) => {
+    try {
+      // Remove the transaction
+      await deleteTransaction(transactionId);
+
+      // Restore account balance if applicable
+      if (accountId && amount) {
+        await updateAccountBalance(accountId, amount, 'add');
+      }
+
+      // Remove payment record from the bill
+      const bill = bills.find(b => b.id === billId);
+      if (!bill) return;
+      const newPayments = (bill.payments || []).filter(p => {
+        // Prefer matching by transactionId when present, otherwise match by year/month/amount
+        if ((p as any).transactionId) return (p as any).transactionId !== transactionId;
+        return !(p.year === year && p.month === month && p.amount === amount);
+      });
+
+      const updates: Partial<Bill> = {
+        payments: newPayments,
+        lastPaidDate: newPayments.length ? newPayments[newPayments.length - 1].paidAt : undefined,
+      };
+      if (bill.isEMI) {
+        updates.emiPaid = Math.max(0, (bill.emiPaid || 0) - 1);
+      }
+      if (bill.frequency === 'one-time') {
+        updates.status = 'pending';
+      }
+
+      await updateBill(billId, updates);
+    } catch (e) {
+      console.error('Error undoing bill payment:', e);
     }
-
-    await updateBill(id, updates);
   };
 
   const getPendingBills = (year: number, month: number): Bill[] => {
@@ -456,6 +531,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         updateBill,
         deleteBill,
         markBillAsPaid,
+        undoBillPayment,
         getPendingBills,
         getOverdueBills,
         loadTransactions,
