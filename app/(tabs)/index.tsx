@@ -213,7 +213,7 @@ export default function DashboardScreen() {
           </View>
         ) : (
           <FlatList
-            data={filteredTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)}
+            data={filteredTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)}
             renderItem={renderTransaction}
             keyExtractor={(item) => item.id}
             scrollEnabled={false}

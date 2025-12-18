@@ -1,5 +1,6 @@
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { colors as themeColors } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBiometricPrompt } from '../../hooks/useBiometricPrompt';
@@ -29,11 +29,18 @@ export default function LoginScreen() {
   const [savedEmail, setSavedEmail] = useState<string | null>(null);
   const { signIn, signUp, biometricLogin, isBiometricAvailable, isBiometricEnabled, getSavedEmail } = useAuth();
   const { promptEnableBiometric } = useBiometricPrompt();
-  const router = useRouter();
 
   useEffect(() => {
     checkBiometricStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresh biometric status when screen comes into focus (e.g., after settings change)
+  useFocusEffect(
+    useCallback(() => {
+      checkBiometricStatus();
+    }, [])
+  );
 
   const checkBiometricStatus = async () => {
     try {
@@ -96,14 +103,15 @@ export default function LoginScreen() {
 
       if (isSignUp) {
         await signUp(currentEmail, currentPassword);
-        await signIn(currentEmail, currentPassword);
+        // Prompt for biometric in background (non-blocking)
+        if (!biometricEnabled && biometricAvailable) {
+          // Don't await - let it happen in background
+          promptEnableBiometric(currentEmail, currentPassword)
+            .then(() => checkBiometricStatus())
+            .catch((error) => console.warn('Biometric setup skipped:', error));
+        }
       } else {
         await signIn(currentEmail, currentPassword);
-      }
-
-      if (!biometricEnabled) {
-        await promptEnableBiometric(currentEmail, currentPassword);
-        await checkBiometricStatus();
       }
     } catch (error: any) {
       Alert.alert('Authentication Failed', error.message);
@@ -119,6 +127,23 @@ export default function LoginScreen() {
     } catch (error: any) {
       Alert.alert('Biometric Login Failed', error.message);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    try {
+      // Note: To enable Google Sign-In, follow docs/GOOGLE_SIGNIN_SETUP.md
+      // This requires OAuth credentials and configuration
+      Alert.alert(
+        'Google Sign-In Setup Required',
+        'To enable Google Sign-In, please follow the setup guide in docs/GOOGLE_SIGNIN_SETUP.md',
+        [{ text: 'OK' }]
+      );
+      setLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', 'Google Sign-In setup required');
       setLoading(false);
     }
   };
@@ -201,13 +226,35 @@ export default function LoginScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.loadingText}>
+                  {isSignUp ? 'Creating account...' : 'Signing in...'}
+                </Text>
+              </>
             ) : (
               <Text style={styles.buttonText}>
                 {isSignUp ? 'Create Account' : 'Sign In'}
               </Text>
             )}
           </TouchableOpacity>
+
+          {/* {isSignUp && (
+            <TouchableOpacity
+              style={[styles.googleButton, loading ? styles.buttonDisabled : null]}
+              onPress={handleGoogleAuth}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <MaterialIcons name="g-translate" size={20} color="#fff" />
+                  <Text style={styles.googleButtonText}>Sign Up with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )} */}
 
           <TouchableOpacity
             onPress={() => {
@@ -362,5 +409,27 @@ const styles = StyleSheet.create({
     color: themeColors.muted,
     marginHorizontal: 12,
     fontSize: 14,
+  },
+  loadingText: {
+    color: themeColors.background,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    elevation: 4,
+  },
+  googleButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
   },
 });

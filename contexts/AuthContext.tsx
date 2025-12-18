@@ -5,7 +5,9 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  User
+  User,
+  signInWithCredential,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { auth } from '../config/firebase';
@@ -23,8 +25,10 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
+  isFirstTimeLogin: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
   biometricLogin: () => Promise<void>;
@@ -41,9 +45,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFirstTimeLogin, setIsFirstTimeLogin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Check if this is first time login
+        const isFirstTime = await checkFirstTimeLogin(user.uid);
+        setIsFirstTimeLogin(isFirstTime);
+      }
       setUser(user);
       setLoading(false);
     });
@@ -54,7 +64,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
-      await signInWithEmailAndPassword(auth, email, password);
+      // Trim whitespace for better matching
+      const cleanEmail = email.trim().toLowerCase();
+      await signInWithEmailAndPassword(auth, cleanEmail, password);
     } catch (err: any) {
       const errorMessage = isNetworkError(err) 
         ? getNetworkErrorMessage() 
@@ -67,11 +79,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string) => {
     try {
       setError(null);
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Trim whitespace for better matching
+      const cleanEmail = email.trim().toLowerCase();
+      const result = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      setIsFirstTimeLogin(true);
+      // Mark first login asynchronously without blocking
+      markFirstTimeLogin(result.user.uid).catch((e) => console.warn('Could not mark first login:', e));
     } catch (err: any) {
       const errorMessage = isNetworkError(err) 
         ? getNetworkErrorMessage() 
         : getErrorMessage(err.code);
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      setError(null);
+      // This will be implemented with proper Google Sign-In integration
+      throw new Error('Google Sign-In not yet configured. Please use email/password for now.');
+    } catch (err: any) {
+      const errorMessage = isNetworkError(err)
+        ? getNetworkErrorMessage()
+        : err.message || 'Google Sign-In failed';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -143,8 +174,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       loading,
       error,
+      isFirstTimeLogin,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
       clearError,
       biometricLogin,
@@ -207,4 +240,22 @@ export const deleteToken = async (key: any) => {
 
 export const isTrueString = (str: any) => {
   return typeof str === "string" && str.trim().toLowerCase() === "true";
-}
+};
+
+const checkFirstTimeLogin = async (uid: string): Promise<boolean> => {
+  try {
+    const isFirstTime = await AsyncStorage.getItem(`first_login_${uid}`);
+    return !isFirstTime;
+  } catch (error) {
+    console.error('Error checking first time login:', error);
+    return false;
+  }
+};
+
+const markFirstTimeLogin = async (uid: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(`first_login_${uid}`, 'true');
+  } catch (error) {
+    console.error('Error marking first time login:', error);
+  }
+};

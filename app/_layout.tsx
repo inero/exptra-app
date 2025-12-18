@@ -27,16 +27,23 @@ function RootLayoutNav() {
 
     console.log('Navigation check:', { user: !!user, inAuthGroup, inTabsGroup, setupComplete: settings.isInitialSetupComplete });
 
-    if (!user && !inAuthGroup) {
-      console.log('Redirecting to login');
-      router.replace('/(auth)/login');
-    } else if (user && !settings.isInitialSetupComplete && !inAuthGroup) {
-      console.log('Redirecting to setup');
-      router.replace('/(auth)/setup');
-    } else if (user && settings.isInitialSetupComplete && !inTabsGroup) {
-      console.log('Redirecting to tabs');
-      router.replace('/(tabs)');
+    if (!user) {
+      if (!inAuthGroup) {
+        console.log('Redirecting to login');
+        router.replace('/(auth)/login');
+      }
+    } else if (user && !settings.isInitialSetupComplete) {
+      if (!inAuthGroup) {
+        console.log('Redirecting to setup');
+        router.replace('/(auth)/setup');
+      }
+    } else if (user && settings.isInitialSetupComplete) {
+      if (!inTabsGroup) {
+        console.log('Redirecting to tabs');
+        router.replace('/(tabs)');
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, settingsLoading, settings.isInitialSetupComplete, segments]);
 
   return (

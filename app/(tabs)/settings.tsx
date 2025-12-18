@@ -1,7 +1,10 @@
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,13 +20,16 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function SettingsScreen() {
   const router = useRouter();
   const { settings, updateSettings } = useApp();
-  const { signOut, disableBiometric, isBiometricAvailable } = useAuth();
+  const { user, signOut, disableBiometric, enableBiometric, isBiometricAvailable } = useAuth();
   
   const [nickname, setNickname] = useState(settings.nickname);
   const [budget, setBudget] = useState(settings.monthlyBudget.toString());
   const [monthStartDate, setMonthStartDate] = useState(settings.monthStartDate.toString());
   const [biometricEnabled, setBiometricEnabled] = useState(settings.biometricEnabled ?? false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const checkBiometricAvailability = async () => {
@@ -42,17 +48,16 @@ export default function SettingsScreen() {
       return;
     }
 
-    setBiometricEnabled(value);
-    await updateSettings({ biometricEnabled: value });
-
     if (value) {
-      Alert.alert(
-        'Biometric Login Enabled',
-        'Your biometric authentication is now enabled. You will be prompted to use it on your next login.'
-      );
+      // When enabling, show password modal
+      setPasswordInput('');
+      setShowPasswordModal(true);
     } else {
+      // Disabling biometric
       try {
         await disableBiometric();
+        setBiometricEnabled(false);
+        await updateSettings({ biometricEnabled: false });
         Alert.alert(
           'Biometric Login Disabled',
           'Your biometric authentication has been disabled.'
@@ -62,6 +67,53 @@ export default function SettingsScreen() {
         Alert.alert('Error', 'Failed to disable biometric login');
       }
     }
+  };
+
+  const handleEnableBiometric = async () => {
+    if (!passwordInput.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const userEmail = user?.email || '';
+      if (!userEmail) {
+        Alert.alert('Error', 'Could not retrieve user email');
+        setBiometricEnabled(false);
+        setShowPasswordModal(false);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Save biometric credentials
+      const success = await enableBiometric(userEmail, passwordInput);
+      if (success) {
+        setBiometricEnabled(true);
+        await updateSettings({ biometricEnabled: true });
+        setShowPasswordModal(false);
+        setPasswordInput('');
+        Alert.alert(
+          'Success',
+          'Biometric login has been enabled successfully.'
+        );
+      } else {
+        setBiometricEnabled(false);
+        Alert.alert('Error', 'Failed to enable biometric. Please check your password and try again.');
+      }
+    } catch (error: any) {
+      console.error('Error enabling biometric:', error);
+      setBiometricEnabled(false);
+      Alert.alert('Error', error.message || 'Failed to enable biometric');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCancelBiometric = () => {
+    setBiometricEnabled(false);
+    setShowPasswordModal(false);
+    setPasswordInput('');
   };
 
   const handleSave = async () => {
@@ -107,6 +159,12 @@ export default function SettingsScreen() {
           },
         },
       ]
+    );
+  };
+
+  const handleDeveloperLink = () => {
+    Linking.openURL('https://immanuel-kirubaharan.github.io/immanuel/').catch((err) =>
+      Alert.alert('Error', 'Could not open developer profile')
     );
   };
 
@@ -196,8 +254,60 @@ export default function SettingsScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>Exptra v1.0.0</Text>
-        <Text style={styles.footerSubtext}>Smart Expense Tracker</Text>
+        <Text style={styles.footerSubtext}>Smart Expense Tracker by</Text>
+        <TouchableOpacity onPress={handleDeveloperLink}>
+          <Text style={styles.developerLink}>Immanuel Kirubaharan</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Password Modal for Biometric Setup */}
+      <Modal
+        visible={showPasswordModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCancelBiometric}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Re-authenticate Required</Text>
+            <Text style={styles.modalSubtitle}>
+              Please enter your password to enable biometric login
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter your password"
+              secureTextEntry
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              editable={!isProcessing}
+              placeholderTextColor="#999"
+            />
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancelBiometric}
+                disabled={isProcessing}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.enableButton, isProcessing && styles.buttonDisabled]}
+                onPress={handleEnableBiometric}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.enableButtonText}>Enable Biometric</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -316,5 +426,81 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: themeColors.muted,
     marginTop: 3,
+  },
+  developerLink: {
+    fontSize: 12,
+    color: themeColors.primary,
+    marginTop: 4,
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: themeColors.surface,
+    borderRadius: 15,
+    padding: 24,
+    width: '85%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: themeColors.text,
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: themeColors.muted,
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: themeColors.card,
+    padding: 12,
+    borderRadius: 10,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    color: themeColors.text,
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: themeColors.card,
+    borderWidth: 1,
+    borderColor: themeColors.muted,
+  },
+  cancelButtonText: {
+    color: themeColors.muted,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  enableButton: {
+    backgroundColor: themeColors.primary,
+  },
+  enableButtonText: {
+    color: themeColors.background,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

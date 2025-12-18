@@ -13,13 +13,29 @@ import {
 } from 'react-native';
 import { colors as themeColors } from '../../constants/theme';
 import { useApp } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function InitialSetupScreen() {
   const [nickname, setNickname] = useState('');
   const [budget, setBudget] = useState('');
   const [monthStartDate, setMonthStartDate] = useState('1');
   const { updateSettings } = useApp();
+  const { user, isBiometricAvailable } = useAuth();
   const router = useRouter();
+
+  // Prompt for biometric setup after initial setup is complete
+  const promptBiometricSetup = async () => {
+    try {
+      const isAvailable = await isBiometricAvailable();
+      if (isAvailable && user?.email) {
+        // Note: For production, you would need to get the password from secure storage or skip this
+        // For now, we'll just prompt without saving credentials again
+        console.log('Biometric is available. Consider enabling from settings.');
+      }
+    } catch (error) {
+      console.error('Error checking biometric availability:', error);
+    }
+  };
 
   const handleSave = async () => {
     const budgetNum = parseFloat(budget);
@@ -47,6 +63,9 @@ export default function InitialSetupScreen() {
       isInitialSetupComplete: true,
     });
 
+    // Check and prompt for biometric after setup
+    await promptBiometricSetup();
+
     router.replace('/(tabs)');
   };
 
@@ -60,6 +79,7 @@ export default function InitialSetupScreen() {
           text: 'Skip',
           onPress: async () => {
             await updateSettings({ isInitialSetupComplete: true });
+            await promptBiometricSetup();
             router.replace('/(tabs)');
           },
         },
