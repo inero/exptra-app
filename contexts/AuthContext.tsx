@@ -10,6 +10,14 @@ import {
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { auth } from '../config/firebase';
 import { getNetworkErrorMessage, isNetworkError } from '../utils/networkUtils';
+import {
+  saveBiometricCredentials,
+  getBiometricCredentials,
+  disableBiometric,
+  isBiometricAvailable,
+  isBiometricEnabled,
+  getSavedEmail,
+} from '../utils/biometricUtils';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +27,12 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  biometricLogin: () => Promise<void>;
+  enableBiometric: (email: string, password: string) => Promise<boolean>;
+  disableBiometric: () => Promise<void>;
+  isBiometricAvailable: () => Promise<boolean>;
+  isBiometricEnabled: () => Promise<boolean>;
+  getSavedEmail: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,6 +77,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const biometricLogin = async () => {
+    try {
+      setError(null);
+      const credentials = await getBiometricCredentials('Use your fingerprint to login');
+      if (!credentials) {
+        throw new Error('Biometric authentication failed or was cancelled');
+      }
+      await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+    } catch (err: any) {
+      const errorMessage = isNetworkError(err)
+        ? getNetworkErrorMessage()
+        : getErrorMessage(err.code || err.message);
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  const enableBiometric = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const success = await saveBiometricCredentials(email, password);
+      if (success) {
+        setError(null);
+      } else {
+        setError('Biometric is not available on this device');
+      }
+      return success;
+    } catch (err: any) {
+      console.error('Error enabling biometric:', err);
+      setError('Failed to enable biometric login');
+      return false;
+    }
+  };
+
+  const disableBiometricLogin = async () => {
+    try {
+      await disableBiometric();
+      setError(null);
+    } catch (err: any) {
+      console.error('Error disabling biometric:', err);
+      throw err;
+    }
+  };
+
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
@@ -82,7 +139,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, signIn, signUp, signOut, clearError }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      error,
+      signIn,
+      signUp,
+      signOut,
+      clearError,
+      biometricLogin,
+      enableBiometric,
+      disableBiometric: disableBiometricLogin,
+      isBiometricAvailable,
+      isBiometricEnabled,
+      getSavedEmail,
+    }}>
       {children}
     </AuthContext.Provider>
   );

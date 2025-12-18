@@ -5,6 +5,7 @@ An intelligent expense tracking mobile application built with React Native (Expo
 ## Features
 
 - 🔐 **Firebase Authentication** - Secure login and signup with persistent sessions
+- 👆 **Biometric Login** - Fingerprint/Face ID authentication for quick access (NEW)
 - 📱 **SMS Reading** - Automatic parsing of banking SMS for transaction detection
 - 💰 **Budget Tracking** - Set monthly budgets and track spending with visual speedometer
 - 📊 **Category Management** - Auto-categorize transactions with manual override options
@@ -139,7 +140,7 @@ const firebaseConfig = {
 exptra-app/
 ├── app/                      # Expo Router screens
 │   ├── (auth)/              # Authentication screens
-│   │   ├── login.tsx        # Login/Signup screen
+│   │   ├── login.tsx        # Login/Signup screen (with biometric)
 │   │   └── setup.tsx        # Initial setup screen
 │   ├── (tabs)/              # Main app tabs
 │   │   ├── index.tsx        # Dashboard screen
@@ -154,10 +155,13 @@ exptra-app/
 │   ├── categories.ts        # Transaction categories
 │   └── theme.ts             # Theme configuration
 ├── contexts/                # React Context providers
-│   ├── AuthContext.tsx      # Authentication state
+│   ├── AuthContext.tsx      # Authentication state (with biometric methods)
 │   ├── AppContext.tsx       # App settings state
 │   └── TransactionContext.tsx # Transaction management
+├── hooks/                   # Custom React hooks
+│   └── useBiometricPrompt.ts # Biometric setup prompt hook
 ├── utils/                   # Utility functions
+│   ├── biometricUtils.ts    # Biometric authentication utilities (NEW)
 │   └── smsParser.ts         # SMS parsing logic
 ├── app.json                 # Expo configuration
 ├── package.json             # Dependencies
@@ -211,12 +215,30 @@ The app requires the following Android permissions:
 - `READ_EXTERNAL_STORAGE` - For file access
 - `WRITE_EXTERNAL_STORAGE` - For data caching
 
+## Biometric Login Feature
+
+### Quick Start
+- Users are prompted to enable biometric after their first login
+- Once enabled, a fingerprint button appears on the login screen
+- One tap with your fingerprint = instant login
+- See `BIOMETRIC_QUICK_REFERENCE.md` for details
+
+### Supported Platforms
+- **iOS**: Face ID (iPhone X+) and Touch ID
+- **Android**: Fingerprint, Face ID, Iris Scanner
+
+### Documentation
+- `BIOMETRIC_FEATURE.md` - Complete technical documentation
+- `BIOMETRIC_INTEGRATION_GUIDE.md` - Integration and testing guide
+- `BIOMETRIC_QUICK_REFERENCE.md` - Quick reference guide
+
 ## Known Limitations
 
-1. **SMS Reading**: Only works on physical Android devices (not in emulators)
-2. **iOS**: SMS reading is not supported on iOS due to platform restrictions
-3. **Bank Support**: Currently supports major Indian banks; patterns can be extended
-4. **Offline Mode**: Full offline support; cloud sync can be implemented using Firebase
+1. **Biometric Testing**: Requires physical device (not available in emulator/simulator)
+2. **SMS Reading**: Only works on physical Android devices (not in emulators)
+3. **iOS**: SMS reading is not supported on iOS due to platform restrictions
+4. **Bank Support**: Currently supports major Indian banks; patterns can be extended
+5. **Offline Mode**: Full offline support; cloud sync can be implemented using Firebase
 
 ## Future Enhancements
 

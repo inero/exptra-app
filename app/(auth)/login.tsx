@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,8 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors as themeColors } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBiometricPrompt } from '../../hooks/useBiometricPrompt';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -22,8 +24,35 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const { signIn, signUp } = useAuth();
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [savedEmail, setSavedEmail] = useState<string | null>(null);
+  const { signIn, signUp, biometricLogin, isBiometricAvailable, isBiometricEnabled, getSavedEmail } = useAuth();
+  const { promptEnableBiometric } = useBiometricPrompt();
   const router = useRouter();
+
+  useEffect(() => {
+    checkBiometricStatus();
+  }, []);
+
+  const checkBiometricStatus = async () => {
+    try {
+      const isAvailable = await isBiometricAvailable();
+      setBiometricAvailable(isAvailable);
+
+      if (isAvailable) {
+        const isEnabled = await isBiometricEnabled();
+        setBiometricEnabled(isEnabled);
+
+        if (isEnabled) {
+          const email = await getSavedEmail();
+          setSavedEmail(email);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking biometric status:', error);
+    }
+  };
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -62,15 +91,33 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
+      const currentEmail = email;
+      const currentPassword = password;
+
       if (isSignUp) {
-        await signUp(email, password);
-        Alert.alert('Success', 'Account created successfully! Please log in.');
-        setIsSignUp(false);
+        await signUp(currentEmail, currentPassword);
+        await signIn(currentEmail, currentPassword);
       } else {
-        await signIn(email, password);
+        await signIn(currentEmail, currentPassword);
+      }
+
+      if (!biometricEnabled) {
+        await promptEnableBiometric(currentEmail, currentPassword);
+        await checkBiometricStatus();
       }
     } catch (error: any) {
       Alert.alert('Authentication Failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    try {
+      await biometricLogin();
+    } catch (error: any) {
+      Alert.alert('Biometric Login Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -92,6 +139,27 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.formContainer}>
+          {biometricEnabled && savedEmail && !isSignUp && (
+            <>
+              <View style={styles.biometricContainer}>
+                <TouchableOpacity
+                  style={[styles.biometricButton, loading ? styles.buttonDisabled : null]}
+                  onPress={handleBiometricLogin}
+                  disabled={loading}
+                >
+                  <MaterialIcons name="fingerprint" size={48} color={themeColors.primary} />
+                  <Text style={styles.biometricText}>Quick Login</Text>
+                  <Text style={styles.biometricSubtext}>{savedEmail}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+            </>
+          )}
+
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
@@ -256,5 +324,43 @@ const styles = StyleSheet.create({
     color: themeColors.primary,
     fontSize: 15,
     fontWeight: '500',
+  },
+  biometricContainer: {
+    marginBottom: 24,
+  },
+  biometricButton: {
+    backgroundColor: themeColors.surface,
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: themeColors.primary,
+    elevation: 2,
+  },
+  biometricText: {
+    color: themeColors.text,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+  },
+  biometricSubtext: {
+    color: themeColors.muted,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dividerText: {
+    color: themeColors.muted,
+    marginHorizontal: 12,
+    fontSize: 14,
   },
 });

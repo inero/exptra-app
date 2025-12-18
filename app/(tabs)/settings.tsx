@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,13 +15,54 @@ import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SettingsScreen() {
-  const { settings, updateSettings } = useApp();
-  const { signOut } = useAuth();
   const router = useRouter();
+  const { settings, updateSettings } = useApp();
+  const { signOut, disableBiometric, isBiometricAvailable } = useAuth();
   
   const [nickname, setNickname] = useState(settings.nickname);
   const [budget, setBudget] = useState(settings.monthlyBudget.toString());
   const [monthStartDate, setMonthStartDate] = useState(settings.monthStartDate.toString());
+  const [biometricEnabled, setBiometricEnabled] = useState(settings.biometricEnabled ?? false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  useEffect(() => {
+    const checkBiometricAvailability = async () => {
+      const available = await isBiometricAvailable();
+      setBiometricAvailable(available);
+    };
+    checkBiometricAvailability();
+  }, [isBiometricAvailable]);
+
+  const handleBiometricToggle = async (value: boolean) => {
+    if (value && !biometricAvailable) {
+      Alert.alert(
+        'Biometric Not Available',
+        'Your device does not have biometric capabilities or no biometric data is enrolled.'
+      );
+      return;
+    }
+
+    setBiometricEnabled(value);
+    await updateSettings({ biometricEnabled: value });
+
+    if (value) {
+      Alert.alert(
+        'Biometric Login Enabled',
+        'Your biometric authentication is now enabled. You will be prompted to use it on your next login.'
+      );
+    } else {
+      try {
+        await disableBiometric();
+        Alert.alert(
+          'Biometric Login Disabled',
+          'Your biometric authentication has been disabled.'
+        );
+      } catch (error) {
+        console.error('Error disabling biometric:', error);
+        Alert.alert('Error', 'Failed to disable biometric login');
+      }
+    }
+  };
 
   const handleSave = async () => {
     const budgetNum = parseFloat(budget);
@@ -118,6 +160,35 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Security Settings</Text>
+        
+        {biometricAvailable && (
+          <View style={styles.switchContainer}>
+            <View style={styles.switchLabelContainer}>
+              <Text style={styles.label}>Biometric Login</Text>
+              <Text style={styles.helpText}>
+                Use your fingerprint to login faster
+              </Text>
+            </View>
+            <Switch
+              value={biometricEnabled}
+              onValueChange={handleBiometricToggle}
+              trackColor={{ false: '#767577', true: themeColors.primary }}
+              thumbColor={biometricEnabled ? '#fff' : '#f4f3f4'}
+            />
+          </View>
+        )}
+        
+        {!biometricAvailable && (
+          <View style={styles.notAvailableContainer}>
+            <Text style={styles.notAvailableText}>
+              Biometric login is not available on this device
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
@@ -205,6 +276,32 @@ const styles = StyleSheet.create({
     color: themeColors.background,
     fontSize: 16,
     fontWeight: '600',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: themeColors.card,
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  notAvailableContainer: {
+    backgroundColor: themeColors.card,
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  notAvailableText: {
+    fontSize: 14,
+    color: themeColors.muted,
+    fontStyle: 'italic',
   },
   footer: {
     alignItems: 'center',
