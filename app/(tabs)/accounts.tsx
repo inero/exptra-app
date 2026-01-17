@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import {
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -217,13 +219,20 @@ export default function AccountsScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
               {editingAccount ? 'Edit Account' : 'Add Account'}
             </Text>
 
-            <ScrollView>
+            <ScrollView 
+              keyboardDismissMode="on-drag"
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+            >
               <Text style={styles.label}>Account Name *</Text>
               <TextInput
                 style={styles.input}
@@ -301,7 +310,7 @@ export default function AccountsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

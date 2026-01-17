@@ -43,6 +43,7 @@ export interface Bill {
   status: 'pending' | 'paid' | 'overdue';
   lastPaidDate?: Date;
   payments?: PaymentRecord[];
+  monthlyAmounts?: { [key: string]: number }; // Track month-specific amounts (key: "YYYY-MM")
   createdAt: Date;
 }
 
@@ -59,6 +60,8 @@ interface TransactionContextType {
   undoBillPayment: (transactionId: string, billId: string, year: number, month: number, accountId?: string, amount?: number) => Promise<void>;
   getPendingBills: (year: number, month: number) => Bill[];
   getOverdueBills: () => Bill[];
+  getBillAmountForMonth: (bill: Bill, year: number, month: number) => number;
+  updateBillAmountForMonth: (billId: string, year: number, month: number, amount: number) => Promise<void>;
   loadTransactions: () => Promise<void>;
   getMonthlyTransactions: (year: number, month: number) => Transaction[];
   getTotalIncome: (year: number, month: number) => number;
@@ -238,6 +241,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         if (bill.emiTenure !== undefined) sanitized.emiTenure = bill.emiTenure;
         if (bill.emiPaid !== undefined) sanitized.emiPaid = bill.emiPaid;
         if (bill.lastPaidDate) sanitized.lastPaidDate = bill.lastPaidDate;
+        if (bill.monthlyAmounts) sanitized.monthlyAmounts = bill.monthlyAmounts;
         if (bill.payments) sanitized.payments = bill.payments.map(p => {
           const sp: any = {
             paidAt: p.paidAt,
@@ -292,6 +296,14 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteTransaction = async (id: string) => {
+    const transactionToDelete = transactions.find(t => t.id === id);
+    
+    // Reverse the account balance impact of the transaction
+    if (transactionToDelete) {
+      const operation = transactionToDelete.type === 'income' ? 'subtract' : 'add';
+      await updateAccountBalance(transactionToDelete.accountId, transactionToDelete.amount, operation);
+    }
+    
     const newTransactions = transactions.filter(t => t.id !== id);
     setTransactions(newTransactions);
     await saveTransactions(newTransactions);
@@ -320,6 +332,24 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     await saveBills(newBills);
   };
 
+  const updateBillAmountForMonth = async (billId: string, year: number, month: number, amount: number) => {
+    const monthKey = getMonthKey(year, month);
+    const newBills = bills.map(b => {
+      if (b.id === billId) {
+        const monthlyAmounts = { ...(b.monthlyAmounts || {}) };
+        if (amount === b.amount) {
+          delete monthlyAmounts[monthKey];
+        } else {
+          monthlyAmounts[monthKey] = amount;
+        }
+        return { ...b, monthlyAmounts: Object.keys(monthlyAmounts).length > 0 ? monthlyAmounts : undefined };
+      }
+      return b;
+    });
+    setBills(newBills);
+    await saveBills(newBills);
+  };
+
   const markBillAsPaid = async (id: string, accountId?: string): Promise<{ transactionId: string; billId: string; year: number; month: number; accountId?: string; amount: number } | null> => {
     const bill = bills.find(b => b.id === id);
     if (!bill) return null;
@@ -337,10 +367,13 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     const account = targetAccountId ? getAccountById(targetAccountId) : undefined;
 
     try {
+      // Get the amount for this specific month (may be overridden for this month)
+      const billAmount = getBillAmountForMonth(bill, year, month);
+      
       // First create transaction so we can link it to the bill payment
       const newTransPayload: Omit<Transaction, 'id'> = {
         type: 'expense',
-        amount: bill.amount,
+        amount: billAmount,
         category: bill.category,
         accountId: targetAccountId,
         accountName: account?.name || '',
@@ -354,13 +387,13 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
       const createdTrans = await addTransaction(newTransPayload);
 
       if (targetAccountId) {
-        await updateAccountBalance(targetAccountId, bill.amount, 'subtract');
+        await updateAccountBalance(targetAccountId, billAmount, 'subtract');
       }
 
       // Now update bill with payment record including transactionId
       const payment: PaymentRecord = {
         paidAt: now,
-        amount: bill.amount,
+        amount: billAmount,
         year,
         month,
         transactionId: createdTrans.id,
@@ -383,7 +416,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
       await updateBill(id, updates);
 
-      return { transactionId: createdTrans.id, billId: id, year, month, accountId: targetAccountId || undefined, amount: bill.amount };
+      return { transactionId: createdTrans.id, billId: id, year, month, accountId: targetAccountId || undefined, amount: billAmount };
     } catch (e) {
       console.error('Error creating transaction for bill payment:', e);
       return null;
@@ -392,13 +425,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
   const undoBillPayment = async (transactionId: string, billId: string, year: number, month: number, accountId?: string, amount?: number) => {
     try {
-      // Remove the transaction
+      // Remove the transaction (account balance is automatically reversed by deleteTransaction)
       await deleteTransaction(transactionId);
-
-      // Restore account balance if applicable
-      if (accountId && amount) {
-        await updateAccountBalance(accountId, amount, 'add');
-      }
 
       // Remove payment record from the bill
       const bill = bills.find(b => b.id === billId);
@@ -472,6 +500,15 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
     }).map(b => ({ ...b, status: 'overdue' as const }));
   };
 
+  const getMonthKey = (year: number, month: number): string => {
+    return `${year}-${String(month + 1).padStart(2, '0')}`;
+  };
+
+  const getBillAmountForMonth = (bill: Bill, year: number, month: number): number => {
+    const monthKey = getMonthKey(year, month);
+    return bill.monthlyAmounts?.[monthKey] ?? bill.amount;
+  };
+
   const getMonthlyTransactions = (year: number, month: number): Transaction[] => {
     return transactions.filter(t => {
       const tDate = new Date(t.date);
@@ -534,6 +571,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         undoBillPayment,
         getPendingBills,
         getOverdueBills,
+        getBillAmountForMonth,
+        updateBillAmountForMonth,
         loadTransactions,
         getMonthlyTransactions,
         getTotalIncome,

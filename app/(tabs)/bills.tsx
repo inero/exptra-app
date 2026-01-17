@@ -3,7 +3,9 @@ import {
   Alert,
   Animated,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,7 +20,7 @@ import { useAccounts } from '../../contexts/AccountContext';
 import { Bill, useTransactions } from '../../contexts/TransactionContext';
 
 export default function BillsScreen() {
-  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, undoBillPayment, getPendingBills, getOverdueBills } = useTransactions();
+  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, undoBillPayment, getPendingBills, getOverdueBills, getBillAmountForMonth, updateBillAmountForMonth } = useTransactions();
   const { accounts } = useAccounts();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
@@ -85,10 +87,11 @@ export default function BillsScreen() {
 
   const openEditModal = (bill: Bill) => {
     setEditingBill(bill);
+    const monthAmount = getBillAmountForMonth(bill, selectedYear, selectedMonth);
     setFormData({
       name: bill.name,
       category: bill.category,
-      amount: bill.amount.toString(),
+      amount: monthAmount.toString(),
       dueDate: bill.dueDate.toString(),
       reminderDate: bill.reminderDate.toString(),
       frequency: bill.frequency,
@@ -118,22 +121,47 @@ export default function BillsScreen() {
       return;
     }
 
-    const billData = {
-      name: formData.name,
-      category: formData.category || 'Other',
-      amount,
-      dueDate,
-      reminderDate,
-      frequency: formData.frequency,
-      isEMI: formData.isEMI,
-      emiTenure: formData.isEMI ? parseInt(formData.emiTenure) || 1 : undefined,
-      emiPaid: formData.isEMI ? (editingBill?.emiPaid || 0) : undefined,
-      status: 'pending' as const,
-    };
-
     if (editingBill) {
-      await updateBill(editingBill.id, { ...billData, createdAt: editingBill.createdAt });
+      const otherFieldsUnchanged = 
+        editingBill.name === formData.name &&
+        editingBill.category === formData.category &&
+        editingBill.dueDate === dueDate &&
+        editingBill.reminderDate === reminderDate &&
+        editingBill.frequency === formData.frequency &&
+        editingBill.isEMI === formData.isEMI;
+
+      // If only amount changed (all other fields unchanged), it's a month-specific edit
+      if (otherFieldsUnchanged) {
+        // Update only the month-specific amount
+        await updateBillAmountForMonth(editingBill.id, selectedYear, selectedMonth, amount);
+      } else {
+        // Update the entire bill definition
+        const billData = {
+          name: formData.name,
+          category: formData.category || 'Other',
+          amount,
+          dueDate,
+          reminderDate,
+          frequency: formData.frequency,
+          isEMI: formData.isEMI,
+          emiTenure: formData.isEMI ? parseInt(formData.emiTenure) || 1 : undefined,
+          emiPaid: formData.isEMI ? (editingBill.emiPaid || 0) : undefined,
+          status: 'pending' as const,
+        };
+        await updateBill(editingBill.id, { ...billData, createdAt: editingBill.createdAt });
+      }
     } else {
+      const billData = {
+        name: formData.name,
+        category: formData.category || 'Other',
+        amount,
+        dueDate,
+        reminderDate,
+        frequency: formData.frequency,
+        isEMI: formData.isEMI,
+        emiTenure: formData.isEMI ? parseInt(formData.emiTenure) || 1 : undefined,
+        status: 'pending' as const,
+      };
       await addBill(billData);
     }
 
@@ -223,6 +251,7 @@ export default function BillsScreen() {
     const isOverdue = item.status === 'overdue';
     const hasPaidThisMonth = item.payments?.some(p => p.year === selectedYear && p.month === selectedMonth);
     const isPaid = item.frequency === 'one-time' ? item.status === 'paid' : !!hasPaidThisMonth;
+    const monthlyAmount = getBillAmountForMonth(item, selectedYear, selectedMonth);
     
     return (
       <TouchableOpacity
@@ -247,7 +276,7 @@ export default function BillsScreen() {
             )}
           </View>
           <View style={styles.billAmount}>
-            <Text style={styles.billAmountText}>₹{item.amount.toLocaleString()}</Text>
+            <Text style={styles.billAmountText}>₹{monthlyAmount.toLocaleString()}</Text>
             <Text style={styles.billFrequency}>{item.frequency}</Text>
           </View>
         </View>
@@ -346,13 +375,20 @@ export default function BillsScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
               {editingBill ? 'Edit Bill' : 'Add Bill'}
             </Text>
 
-            <ScrollView>
+            <ScrollView 
+              keyboardDismissMode="on-drag"
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+            >
               <Text style={styles.label}>Bill Name *</Text>
               <TextInput
                 style={styles.input}
@@ -467,7 +503,7 @@ export default function BillsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Account selector modal for choosing which account to debit */}
