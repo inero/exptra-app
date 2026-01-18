@@ -18,7 +18,9 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "withoutCredentials": true,
+        "releaseChannel": "production"
       }
     }
   },
