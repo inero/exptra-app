@@ -22,7 +22,9 @@ const MAPPING = {
   'list.bullet': 'format-list-bulleted',
   'doc.text.fill': 'description',
   'gearshape.fill': 'settings',
-  'chart.bar.fill': 'bar-chart'
+  'chart.bar.fill': 'bar-chart',
+  'line.3.horizontal': 'menu',
+  'xmark': 'close',
 } as IconMapping;
 
 /**

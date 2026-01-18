@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HamburgerMenu from '../../components/HamburgerMenu';
 import MonthSelector from '../../components/MonthSelector';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
 import { Bill, useTransactions } from '../../contexts/TransactionContext';
@@ -29,6 +31,7 @@ export default function BillsScreen() {
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'overdue'>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -319,11 +322,22 @@ export default function BillsScreen() {
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }] }>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>Bills & EMI</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Bills & EMI</Text>
+        </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="bills"
+      />
 
       <MonthSelector
         selectedMonth={selectedMonth}
@@ -572,23 +586,34 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: 20,
     backgroundColor: themeColors.primary,
     paddingBottom: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 5,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
+    flex: 1,
   },
   addButton: {
     backgroundColor: themeColors.background,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   addButtonText: {
     color: themeColors.primary,

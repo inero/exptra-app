@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { Card, List, Surface, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HamburgerMenu from '../../components/HamburgerMenu';
 import ImprovedSpeedometer from '../../components/ImprovedSpeedometer';
 import MonthSelector from '../../components/MonthSelector';
 import PieChart from '../../components/PieChart';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
@@ -41,6 +43,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [showAmounts, setShowAmounts] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
   const theme = useTheme();
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
@@ -116,9 +119,20 @@ export default function DashboardScreen() {
       }
     >
       <Surface style={[styles.header, { backgroundColor: themeColors.primary, paddingTop: insets.top + 16 }] }>
-        <Text style={[styles.greeting, { color: themeColors.background }]}>Hello, {settings.nickname || 'User'}</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={[styles.greeting, { color: themeColors.background }]}>Hello, {settings.nickname || 'User'}</Text>
+        </View>
         <Text style={[styles.subtitle, { color: themeColors.background }]}>Here's your expense overview</Text>
       </Surface>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="index"
+      />
 
       <MonthSelector
         selectedMonth={selectedMonth}
@@ -269,10 +283,22 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.primary,
     paddingBottom: 16,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 12,
+  },
   greeting: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
+    flex: 1,
   },
   subtitle: {
     fontSize: 16,

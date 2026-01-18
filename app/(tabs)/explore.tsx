@@ -11,7 +11,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HamburgerMenu from '../../components/HamburgerMenu';
 import MonthSelector from '../../components/MonthSelector';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { CATEGORIES, CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
@@ -27,6 +29,7 @@ export default function TransactionsScreen() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [menuVisible, setMenuVisible] = useState(false);
   
   const [formData, setFormData] = useState({
     type: 'expense' as 'income' | 'expense',
@@ -170,7 +173,12 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>Transactions</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Transactions</Text>
+        </View>
         <TouchableOpacity 
           style={styles.addButton}
           onPress={() => {
@@ -181,6 +189,12 @@ export default function TransactionsScreen() {
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="explore"
+      />
 
       <MonthSelector
         selectedMonth={selectedMonth}
@@ -320,23 +334,34 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: 20,
     backgroundColor: themeColors.primary,
     paddingBottom: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
+    flex: 1,
   },
   addButton: {
     backgroundColor: themeColors.background,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   addButtonText: {
     color: themeColors.primary,

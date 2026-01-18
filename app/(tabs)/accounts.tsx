@@ -13,6 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HamburgerMenu from '../../components/HamburgerMenu';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { colors as themeColors } from '../../constants/theme';
 import { Account, useAccounts } from '../../contexts/AccountContext';
 import { useTransactions } from '../../contexts/TransactionContext';
@@ -21,8 +24,10 @@ export default function AccountsScreen() {
   const { accounts, addAccount, updateAccount, deleteAccount, getTotalBalance } = useAccounts();
   const { getAccountWiseData } = useTransactions();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -186,12 +191,23 @@ export default function AccountsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Accounts</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Accounts</Text>
+        </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="accounts"
+      />
 
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total Balance</Text>
@@ -322,23 +338,33 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: 20,
     backgroundColor: themeColors.primary,
-    paddingTop: 60,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
+    flex: 1,
   },
   addButton: {
     backgroundColor: themeColors.background,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   addButtonText: {
     color: themeColors.primary,

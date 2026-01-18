@@ -12,8 +12,10 @@ import {
 import { Card } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BarChart from '../../components/BarChart';
+import HamburgerMenu from '../../components/HamburgerMenu';
 import MonthSelector from '../../components/MonthSelector';
 import PieChart from '../../components/PieChart';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { Transaction, useTransactions } from '../../contexts/TransactionContext';
@@ -30,6 +32,7 @@ export default function ReportsScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
   const currentMonthIncome = getTotalIncome(selectedYear, selectedMonth);
@@ -300,8 +303,19 @@ export default function ReportsScreen() {
   return (
     <Animated.View style={[{ opacity: fadeAnim }, { flex: 1, backgroundColor: themeColors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={[styles.headerTitle, { color: themeColors.background }]}>Reports</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: themeColors.background }]}>Reports</Text>
+        </View>
       </View>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="reports"
+      />
 
       <View style={styles.viewModeSelector}>
         <TouchableOpacity
@@ -333,12 +347,20 @@ const styles = StyleSheet.create({
     backgroundColor: themeColors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: 20,
     backgroundColor: themeColors.primary,
     paddingBottom: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 28,

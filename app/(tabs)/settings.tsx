@@ -13,12 +13,16 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import HamburgerMenu from '../../components/HamburgerMenu';
+import { IconSymbol } from '../../components/ui/icon-symbol';
 import { colors as themeColors } from '../../constants/theme';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { settings, updateSettings } = useApp();
   const { user, signOut, disableBiometric, enableBiometric, isBiometricAvailable } = useAuth();
   
@@ -30,6 +34,7 @@ export default function SettingsScreen() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   useEffect(() => {
     const checkBiometricAvailability = async () => {
@@ -170,9 +175,20 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.hamburgerButton}>
+            <IconSymbol name="line.3.horizontal" size={24} color={themeColors.background} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
       </View>
+
+      <HamburgerMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        currentRoute="settings"
+      />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Profile Settings</Text>
@@ -320,12 +336,22 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     backgroundColor: themeColors.primary,
-    paddingTop: 60,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hamburgerButton: {
+    padding: 8,
+    marginLeft: -8,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: themeColors.background,
+    flex: 1,
   },
   section: {
     backgroundColor: themeColors.surface,
