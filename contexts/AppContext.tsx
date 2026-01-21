@@ -4,6 +4,13 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 
+export interface NotificationPreferences {
+  enabled: boolean;
+  notificationTime: number; // Hour (0-23)
+  notificationType: 'funny' | 'formal' | 'mixed';
+  sendDaily: boolean;
+}
+
 export interface UserSettings {
   nickname: string;
   email: string;
@@ -11,6 +18,7 @@ export interface UserSettings {
   monthStartDate: number;
   isInitialSetupComplete: boolean;
   biometricEnabled?: boolean;
+  notificationPreferences?: NotificationPreferences;
 }
 
 interface AppContextType {
@@ -27,6 +35,12 @@ const defaultSettings: UserSettings = {
   monthStartDate: 1,
   isInitialSetupComplete: false,
   biometricEnabled: false,
+  notificationPreferences: {
+    enabled: false,
+    notificationTime: 18, // 6 PM
+    notificationType: 'mixed',
+    sendDaily: true,
+  },
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);

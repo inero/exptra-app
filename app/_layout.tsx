@@ -14,6 +14,7 @@ import { AccountProvider } from '../contexts/AccountContext';
 import { AppProvider, useApp } from '../contexts/AppContext';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { TransactionProvider } from '../contexts/TransactionContext';
+import { useNotificationSetup } from '../hooks/useNotificationSetup';
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -21,6 +22,9 @@ function RootLayoutNav() {
   const { settings, loading: settingsLoading } = useApp();
   const segments = useSegments();
   const router = useRouter();
+
+  // Initialize notifications
+  useNotificationSetup();
 
   interface UserSettings {
     nickname: string;

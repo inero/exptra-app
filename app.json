@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.exptra.app"
+      "bundleIdentifier": "com.exptra.app",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Allow notifications to stay up to date with the latest news and updates."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,12 +23,7 @@
         "monochromeImage": "./assets/images/android-chrome-512x512.png"
       },
       "package": "com.exptra.app",
-      "permissions": [
-        "READ_SMS",
-        "RECEIVE_SMS",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ],
+      "permissions": ["android.permission.POST_NOTIFICATIONS"],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

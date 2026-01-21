@@ -13,8 +13,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import NotificationSettings from '../../components/NotificationSettings';
 import { colors as themeColors } from '../../constants/theme';
-import { useApp } from '../../contexts/AppContext';
+import { NotificationPreferences, useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SettingsScreen() {
@@ -30,6 +31,14 @@ export default function SettingsScreen() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(
+    settings.notificationPreferences || {
+      enabled: false,
+      notificationTime: 18,
+      notificationType: 'mixed',
+      sendDaily: true,
+    }
+  );
 
   useEffect(() => {
     const checkBiometricAvailability = async () => {
@@ -168,6 +177,20 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleNotificationPreferencesChange = async (
+    newPreferences: NotificationPreferences
+  ) => {
+    try {
+      setNotificationPreferences(newPreferences);
+      await updateSettings({
+        notificationPreferences: newPreferences,
+      });
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+      Alert.alert('Error', 'Failed to update notification settings');
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -244,6 +267,14 @@ export default function SettingsScreen() {
             </Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>🔔 Notification Reminders</Text>
+        <NotificationSettings
+          preferences={notificationPreferences}
+          onPreferencesChange={handleNotificationPreferencesChange}
+        />
       </View>
 
       <View style={styles.section}>
