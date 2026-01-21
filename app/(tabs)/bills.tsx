@@ -19,9 +19,10 @@ import MonthSelector from '../../components/MonthSelector';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
 import { Bill, useTransactions } from '../../contexts/TransactionContext';
+import { getAppStartDate, getMonthsWithData } from '../../utils/dateUtils';
 
 export default function BillsScreen() {
-  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, undoBillPayment, getPendingBills, getOverdueBills, getBillAmountForMonth, updateBillAmountForMonth } = useTransactions();
+  const { bills, addBill, updateBill, deleteBill, markBillAsPaid, undoBillPayment, getPendingBills, getOverdueBills, getBillAmountForMonth, updateBillAmountForMonth, transactions } = useTransactions();
   const { accounts } = useAccounts();
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,6 +30,15 @@ export default function BillsScreen() {
   const [selectedTab, setSelectedTab] = useState<'all' | 'pending' | 'overdue'>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [appStartDate, setAppStartDate] = useState(new Date());
+  const [monthsWithData, setMonthsWithData] = useState<Set<string>>(new Set());
+
+  // Calculate app start date and months with data
+  useEffect(() => {
+    const startDate = getAppStartDate(transactions, bills);
+    setAppStartDate(startDate);
+    setMonthsWithData(getMonthsWithData(transactions, bills));
+  }, [transactions, bills]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -333,6 +343,8 @@ export default function BillsScreen() {
           setSelectedYear(year);
         }}
         allowFutureMonths={true}
+        minDate={appStartDate}
+        monthsWithData={monthsWithData}
       />
 
       <View style={styles.tabs}>

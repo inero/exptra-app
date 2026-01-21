@@ -7,6 +7,8 @@ interface MonthSelectorProps {
   selectedYear: number;
   onMonthChange: (month: number, year: number) => void;
   allowFutureMonths?: boolean;
+  minDate?: Date;
+  monthsWithData?: Set<string>;
 }
 
 export default function MonthSelector({
@@ -14,10 +16,20 @@ export default function MonthSelector({
   selectedYear,
   onMonthChange,
   allowFutureMonths = false,
+  minDate,
+  monthsWithData,
 }: MonthSelectorProps) {
   const today = new Date();
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
+
+  const minMonth = minDate ? minDate.getMonth() : 0;
+  const minYear = minDate ? minDate.getFullYear() : 0;
+
+  const hasData = (year: number, month: number): boolean => {
+    if (!monthsWithData) return true; // If no data provided, allow navigation
+    return monthsWithData.has(`${year}-${month}`);
+  };
 
   const shiftMonth = (offset: number) => {
     let newMonth = selectedMonth + offset;
@@ -31,6 +43,16 @@ export default function MonthSelector({
       newYear -= 1;
     }
 
+    // Check if the new month is before app start date
+    if (minDate && (newYear < minYear || (newYear === minYear && newMonth < minMonth))) {
+      return;
+    }
+
+    // Check if the new month has data
+    if (!hasData(newYear, newMonth)) {
+      return;
+    }
+
     // Check if the new month is in the future and if future months are not allowed
     if (!allowFutureMonths && (newYear > currentYear || (newYear === currentYear && newMonth > currentMonth))) {
       return; // Don't allow navigation to future months
@@ -40,8 +62,28 @@ export default function MonthSelector({
   };
 
   const isCurrentMonth = selectedMonth === currentMonth && selectedYear === currentYear;
-  const isFutureMonth = selectedYear > currentYear || (selectedYear === currentYear && selectedMonth > currentMonth);
-  const canNavigateNext = allowFutureMonths || !isFutureMonth || selectedMonth < currentMonth;
+  const isBeforeAppStart = minDate && (selectedYear < minYear || (selectedYear === minYear && selectedMonth < minMonth));
+  
+  // Check if we can navigate to previous month
+  let prevMonth = selectedMonth - 1;
+  let prevYear = selectedYear;
+  if (prevMonth < 0) {
+    prevMonth = 11;
+    prevYear -= 1;
+  }
+  const prevMonthHasData = hasData(prevYear, prevMonth);
+  const canNavigatePrev = !isBeforeAppStart && prevMonthHasData && !(selectedYear === minYear && selectedMonth === minMonth);
+  
+  // Check if we can navigate to next month
+  let nextMonth = selectedMonth + 1;
+  let nextYear = selectedYear;
+  if (nextMonth > 11) {
+    nextMonth = 0;
+    nextYear += 1;
+  }
+  const nextMonthHasData = hasData(nextYear, nextMonth);
+  const isFutureNextMonth = nextYear > currentYear || (nextYear === currentYear && nextMonth > currentMonth);
+  const canNavigateNext = nextMonthHasData && (allowFutureMonths || !isFutureNextMonth);
 
   const monthName = new Date(selectedYear, selectedMonth).toLocaleString(undefined, {
     month: 'long',
@@ -52,9 +94,10 @@ export default function MonthSelector({
     <View style={styles.container}>
       <TouchableOpacity
         onPress={() => shiftMonth(-1)}
-        style={styles.navButton}
+        style={[styles.navButton, !canNavigatePrev && styles.disabledButton]}
+        disabled={!canNavigatePrev}
       >
-        <Text style={styles.navButtonText}>◀</Text>
+        <Text style={[styles.navButtonText, !canNavigatePrev && styles.disabledText]}>◀</Text>
       </TouchableOpacity>
 
       <View style={styles.monthDisplay}>

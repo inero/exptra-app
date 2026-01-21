@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -17,9 +17,10 @@ import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
 import { useApp } from '../../contexts/AppContext';
 import { Transaction, useTransactions } from '../../contexts/TransactionContext';
+import { getAppStartDate, getMonthsWithData } from '../../utils/dateUtils';
 
 export default function TransactionsScreen() {
-  const { transactions, addTransaction, deleteTransaction, updateTransaction, getMonthlyTransactions } = useTransactions();
+  const { transactions, addTransaction, deleteTransaction, updateTransaction, getMonthlyTransactions, bills } = useTransactions();
   const { accounts, updateAccountBalance } = useAccounts();
   const { settings } = useApp();
   const insets = useSafeAreaInsets();
@@ -27,6 +28,15 @@ export default function TransactionsScreen() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [appStartDate, setAppStartDate] = useState(new Date());
+  const [monthsWithData, setMonthsWithData] = useState<Set<string>>(new Set());
+  
+  // Calculate app start date and months with data
+  useEffect(() => {
+    const startDate = getAppStartDate(transactions, bills);
+    setAppStartDate(startDate);
+    setMonthsWithData(getMonthsWithData(transactions, bills));
+  }, [transactions, bills]);
   
   const [formData, setFormData] = useState({
     type: 'expense' as 'income' | 'expense',
@@ -190,6 +200,8 @@ export default function TransactionsScreen() {
           setSelectedYear(year);
         }}
         allowFutureMonths={false}
+        minDate={appStartDate}
+        monthsWithData={monthsWithData}
       />
 
       <FlatList

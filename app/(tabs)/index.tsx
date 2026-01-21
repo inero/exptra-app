@@ -1,11 +1,17 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -14,11 +20,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ImprovedSpeedometer from '../../components/ImprovedSpeedometer';
 import MonthSelector from '../../components/MonthSelector';
 import PieChart from '../../components/PieChart';
-import { CATEGORY_ICONS } from '../../constants/categories';
+import { CATEGORIES, CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { useAccounts } from '../../contexts/AccountContext';
 import { useApp } from '../../contexts/AppContext';
 import { Transaction, useTransactions } from '../../contexts/TransactionContext';
+import { getAppStartDate, getMonthsWithData } from '../../utils/dateUtils';
 
 const CHART_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -32,8 +39,8 @@ const ACCOUNT_CHART_COLORS = [
 
 export default function DashboardScreen() {
   const { settings } = useApp();
-  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, getPendingBills, getOverdueBills, getCategoryWiseExpense, getAccountWiseData } = useTransactions();
-  const { getTotalBalance } = useAccounts();
+  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, getPendingBills, getOverdueBills, getCategoryWiseExpense, getAccountWiseData, transactions, bills, addTransaction, updateTransaction } = useTransactions();
+  const { accounts, getTotalBalance, updateAccountBalance } = useAccounts();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -41,7 +48,93 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [showAmounts, setShowAmounts] = useState(true);
+  const [appStartDate, setAppStartDate] = useState(new Date());
+  const [monthsWithData, setMonthsWithData] = useState<Set<string>>(new Set());
+  const [quickAddModalVisible, setQuickAddModalVisible] = useState(false);
+  const [formData, setFormData] = useState({
+    type: 'expense' as 'income' | 'expense',
+    amount: '',
+    category: '',
+    accountId: '',
+    description: '',
+  });
   const theme = useTheme();
+  const fabScale = useRef(new Animated.Value(1)).current;
+
+  // Calculate app start date and months with data
+  useEffect(() => {
+    const startDate = getAppStartDate(transactions, bills);
+    setAppStartDate(startDate);
+    setMonthsWithData(getMonthsWithData(transactions, bills));
+  }, [transactions, bills]);
+
+  const resetForm = () => {
+    setFormData({
+      type: 'expense',
+      amount: '',
+      category: '',
+      accountId: '',
+      description: '',
+    });
+  };
+
+  const handleQuickAddTransaction = async () => {
+    const amount = parseFloat(formData.amount);
+    
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+    
+    if (!formData.category) {
+      Alert.alert('Error', 'Please select a category');
+      return;
+    }
+
+    if (!formData.accountId) {
+      Alert.alert('Error', 'Please select an account');
+      return;
+    }
+
+    const selectedAccount = accounts.find(a => a.id === formData.accountId);
+    if (!selectedAccount) {
+      Alert.alert('Error', 'Invalid account selected');
+      return;
+    }
+
+    const transaction = {
+      type: formData.type,
+      amount,
+      category: formData.category,
+      accountId: formData.accountId,
+      accountName: selectedAccount.name,
+      bankName: selectedAccount.bankName || selectedAccount.name,
+      description: formData.description,
+      date: new Date(),
+      isManual: true,
+    };
+
+    try {
+      const operation = formData.type === 'income' ? 'add' : 'subtract';
+      await updateAccountBalance(formData.accountId, amount, operation);
+      await addTransaction(transaction);
+      
+      // Close silently without popup - dashboard will update automatically
+      resetForm();
+      setQuickAddModalVisible(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add transaction');
+      console.error(error);
+    }
+  };
+
+  const handleFABPress = () => {
+    Animated.sequence([
+      Animated.timing(fabScale, { toValue: 0.9, duration: 100, useNativeDriver: true }),
+      Animated.timing(fabScale, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+    setQuickAddModalVisible(true);
+  };
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
   const filteredTransactions = monthlyTransactions.filter(t => {
@@ -109,12 +202,13 @@ export default function DashboardScreen() {
   );
 
   return (
-    <Animated.ScrollView 
-      style={[styles.container, { opacity: fadeAnim }]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <View style={styles.container}>
+      <Animated.ScrollView 
+        style={[{ opacity: fadeAnim }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
       <Surface style={[styles.header, { backgroundColor: themeColors.primary, paddingTop: insets.top + 16 }] }>
         <Text style={[styles.greeting, { color: themeColors.background }]}>Hello, {settings.nickname || 'User'}</Text>
         <Text style={[styles.subtitle, { color: themeColors.background }]}>Here's your expense overview</Text>
@@ -128,6 +222,8 @@ export default function DashboardScreen() {
           setSelectedYear(year);
         }}
         allowFutureMonths={false}
+        minDate={appStartDate}
+        monthsWithData={monthsWithData}
       />
 
       <Animated.View style={[styles.speedometerContainer, { transform: [{ scale: fadeAnim.interpolate({ inputRange: [0,1], outputRange: [0.98,1] }) }] }] }>
@@ -255,10 +351,157 @@ export default function DashboardScreen() {
           />
         </View>
       )}
-    </Animated.ScrollView>
+      </Animated.ScrollView>
+
+      {/* Floating Action Button */}
+      <Animated.View
+        style={[
+          styles.fab,
+          { transform: [{ scale: fabScale }] },
+          { bottom: insets.bottom + 20 },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.fabButton}
+          onPress={handleFABPress}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.fabIcon}>+</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Quick Add Modal - Compact */}
+      <Modal
+        visible={quickAddModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          resetForm();
+          setQuickAddModalVisible(false);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.compactModalOverlay}
+        >
+          <View style={styles.compactModalContent}>
+            {/* Header */}
+            <View style={styles.compactModalHeader}>
+              <TouchableOpacity
+                onPress={() => {
+                  resetForm();
+                  setQuickAddModalVisible(false);
+                }}
+              >
+                <Text style={styles.compactCloseButton}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Type Selector */}
+            <View style={styles.compactTypeSelector}>
+              <TouchableOpacity
+                style={[
+                  styles.compactTypeButton,
+                  formData.type === 'expense' && styles.compactTypeButtonActive,
+                ]}
+                onPress={() => setFormData({ ...formData, type: 'expense' })}
+              >
+                <Text style={styles.compactTypeButtonIcon}>💰</Text>
+                <Text style={styles.compactTypeButtonText}>Expense</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.compactTypeButton,
+                  formData.type === 'income' && styles.compactTypeButtonActive,
+                ]}
+                onPress={() => setFormData({ ...formData, type: 'income' })}
+              >
+                <Text style={styles.compactTypeButtonIcon}>📈</Text>
+                <Text style={styles.compactTypeButtonText}>Income</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount Input */}
+            <View style={styles.compactAmountInput}>
+              <Text style={styles.compactCurrencySymbol}>₹</Text>
+              <TextInput
+                style={styles.compactAmountField}
+                value={formData.amount}
+                onChangeText={(text) => setFormData({ ...formData, amount: text })}
+                placeholder="Amount"
+                keyboardType="decimal-pad"
+                placeholderTextColor={themeColors.muted}
+              />
+            </View>
+
+            {/* Category - Horizontal Scroll */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.compactCategoryScroll}
+              contentContainerStyle={styles.compactCategoryContent}
+            >
+              {Array.from(new Set([...CATEGORIES.EXPENSE, ...CATEGORIES.INCOME])).map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.compactCategoryButton,
+                    formData.category === cat && styles.compactCategoryButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, category: cat })}
+                >
+                  <Text style={styles.compactCategoryIcon}>{CATEGORY_ICONS[cat] || '📄'}</Text>
+                  <Text style={styles.compactCategoryLabel}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Account - Horizontal Scroll */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.compactAccountScroll}
+              contentContainerStyle={styles.compactAccountContent}
+            >
+              {accounts.map((acc) => (
+                <TouchableOpacity
+                  key={acc.id}
+                  style={[
+                    styles.compactAccountButton,
+                    formData.accountId === acc.id && styles.compactAccountButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, accountId: acc.id })}
+                >
+                  <Text style={styles.compactAccountName}>{acc.name}</Text>
+                  <Text style={styles.compactAccountBalance}>₹{(acc.balance / 1000).toFixed(0)}K</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={styles.compactModalButtons}>
+              <TouchableOpacity
+                style={styles.compactAddButton}
+                onPress={handleQuickAddTransaction}
+              >
+                <Text style={styles.compactAddButtonText}>Add Transaction</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.compactCancelButton}
+                onPress={() => {
+                  resetForm();
+                  setQuickAddModalVisible(false);
+                }}
+              >
+                <Text style={styles.compactCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -447,6 +690,370 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: themeColors.muted,
     marginTop: 5,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 10,
+  },
+  fabButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: themeColors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: themeColors.primary,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  fabIcon: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: themeColors.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: themeColors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: themeColors.text,
+  },
+  closeButton: {
+    fontSize: 24,
+    color: themeColors.muted,
+    fontWeight: '600',
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: themeColors.card,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  typeButtonActive: {
+    backgroundColor: themeColors.primary,
+    borderColor: themeColors.primary,
+  },
+  typeButtonIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  typeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: themeColors.text,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: themeColors.text,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  amountInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: themeColors.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  currencySymbol: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: themeColors.primary,
+    marginRight: 8,
+  },
+  amountField: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
+    color: themeColors.text,
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryButton: {
+    width: '23%',
+    aspectRatio: 1,
+    backgroundColor: themeColors.card,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  categoryButtonActive: {
+    borderColor: themeColors.primary,
+    backgroundColor: 'rgba(99,102,241,0.1)',
+  },
+  categoryButtonIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  categoryButtonLabel: {
+    fontSize: 10,
+    color: themeColors.muted,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  accountSelector: {
+    gap: 10,
+  },
+  accountButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: themeColors.card,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  accountButtonActive: {
+    borderColor: themeColors.primary,
+    backgroundColor: 'rgba(99,102,241,0.1)',
+  },
+  accountName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: themeColors.text,
+  },
+  accountType: {
+    fontSize: 12,
+    color: themeColors.muted,
+    marginTop: 4,
+  },
+  input: {
+    backgroundColor: themeColors.card,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    color: themeColors.text,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: themeColors.card,
+  },
+  cancelButtonText: {
+    color: themeColors.muted,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  addButton: {
+    backgroundColor: themeColors.primary,
+  },
+  addButtonText: {
+    color: themeColors.background,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  // Compact Modal Styles
+  compactModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  compactModalContent: {
+    backgroundColor: themeColors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    maxHeight: '50%',
+  },
+  compactModalHeader: {
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  compactCloseButton: {
+    fontSize: 28,
+    color: themeColors.muted,
+    fontWeight: '600',
+  },
+  compactTypeSelector: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  compactTypeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: themeColors.card,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  compactTypeButtonActive: {
+    backgroundColor: themeColors.primary,
+    borderColor: themeColors.primary,
+  },
+  compactTypeButtonIcon: {
+    fontSize: 24,
+  },
+  compactTypeButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: themeColors.text,
+  },
+  compactAmountInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: themeColors.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  compactCurrencySymbol: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: themeColors.primary,
+    marginRight: 8,
+  },
+  compactAmountField: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontWeight: '700',
+    color: themeColors.text,
+  },
+  compactCategoryScroll: {
+    marginBottom: 10,
+  },
+  compactCategoryContent: {
+    gap: 8,
+    paddingHorizontal: 0,
+  },
+  compactCategoryButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: themeColors.card,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    minWidth: 70,
+  },
+  compactCategoryButtonActive: {
+    borderColor: themeColors.primary,
+    backgroundColor: 'rgba(99,102,241,0.1)',
+  },
+  compactCategoryIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  compactCategoryLabel: {
+    fontSize: 9,
+    color: themeColors.muted,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  compactAccountScroll: {
+    marginBottom: 12,
+  },
+  compactAccountContent: {
+    gap: 8,
+    paddingHorizontal: 0,
+  },
+  compactAccountButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: themeColors.card,
+    borderRadius: 8,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+    minWidth: 90,
+  },
+  compactAccountButtonActive: {
+    borderColor: themeColors.primary,
+    backgroundColor: 'rgba(99,102,241,0.1)',
+  },
+  compactAccountName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: themeColors.text,
+    textAlign: 'center',
+  },
+  compactAccountBalance: {
+    fontSize: 9,
+    color: themeColors.muted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  compactModalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  compactAddButton: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: themeColors.primary,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  compactAddButtonText: {
+    color: themeColors.background,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  compactCancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: themeColors.card,
+    borderRadius: 10,
+  },
+  compactCancelButtonText: {
+    color: themeColors.muted,
+    fontWeight: '600',
+    fontSize: 13,
   },
 });
 

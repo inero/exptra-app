@@ -18,13 +18,14 @@ interface BarChartProps {
 export default function BarChart({
   data,
   title = 'Income vs Expense',
-  height = 300,
+  height = 400,
 }: BarChartProps) {
-  const padding = 40;
-  const chartHeight = height - padding * 2;
-  const chartWidth = Math.max(300, data.length * 60);
-  const barWidth = 20;
-  const groupSpacing = 60;
+  const padding = 50;
+  const topPadding = 70; // Extra space for value labels
+  const chartHeight = height - padding - topPadding;
+  const barWidth = 16;
+  const groupSpacing = 80; // More spacing for 12 months
+  const chartWidth = Math.max(500, data.length * groupSpacing + padding * 2);
 
   // Calculate max value for scaling
   const maxValue = Math.max(...data.flatMap(d => [d.income, d.expense]));
@@ -42,16 +43,16 @@ export default function BarChart({
     <View style={styles.container}>
       {title && <Text style={styles.title}>{title}</Text>}
       
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 20 }}>
         <Svg width={chartWidth} height={height} viewBox={`0 0 ${chartWidth} ${height}`}>
           {/* Y-axis */}
           <Line
             x1={padding}
-            y1={padding}
+            y1={topPadding}
             x2={padding}
             y2={height - padding}
             stroke={themeColors.muted}
-            strokeWidth="1"
+            strokeWidth="1.5"
           />
           
           {/* X-axis */}
@@ -61,7 +62,7 @@ export default function BarChart({
             x2={chartWidth - padding}
             y2={height - padding}
             stroke={themeColors.muted}
-            strokeWidth="1"
+            strokeWidth="1.5"
           />
 
           {/* Grid lines and Y-axis labels */}
@@ -80,9 +81,10 @@ export default function BarChart({
                   strokeDasharray="5,5"
                 />
                 <SvgText
-                  x={padding - 5}
-                  y={y + 4}
-                  fontSize="11"
+                  x={padding - 10}
+                  y={y + 5}
+                  fontSize="12"
+                  fontWeight="500"
                   fill={themeColors.muted}
                   textAnchor="end"
                 >
@@ -104,29 +106,58 @@ export default function BarChart({
               <G key={`bar-group-${idx}`}>
                 {/* Income bar */}
                 <Rect
-                  x={groupX - barWidth - 2}
+                  x={groupX - barWidth - 4}
                   y={incomeY}
                   width={barWidth}
                   height={incomeHeight}
                   fill="#4CAF50"
-                  rx="4"
+                  rx="3"
                 />
+                
+                {/* Income value label */}
+                {item.income > 0 && (
+                  <SvgText
+                    x={groupX - barWidth - 4 + barWidth / 2}
+                    y={incomeY - 5}
+                    fontSize="10"
+                    fontWeight="600"
+                    fill="#4CAF50"
+                    textAnchor="middle"
+                  >
+                    ₹{(item.income / 1000).toFixed(0)}K
+                  </SvgText>
+                )}
                 
                 {/* Expense bar */}
                 <Rect
-                  x={groupX + 2}
+                  x={groupX + 4}
                   y={expenseY}
                   width={barWidth}
                   height={expenseHeight}
                   fill="#F44336"
-                  rx="4"
+                  rx="3"
                 />
+
+                {/* Expense value label */}
+                {item.expense > 0 && (
+                  <SvgText
+                    x={groupX + 4 + barWidth / 2}
+                    y={expenseY - 5}
+                    fontSize="10"
+                    fontWeight="600"
+                    fill="#F44336"
+                    textAnchor="middle"
+                  >
+                    ₹{(item.expense / 1000).toFixed(0)}K
+                  </SvgText>
+                )}
 
                 {/* X-axis label */}
                 <SvgText
                   x={groupX}
-                  y={height - padding + 20}
-                  fontSize="11"
+                  y={height - padding + 22}
+                  fontSize="12"
+                  fontWeight="600"
                   fill={themeColors.text}
                   textAnchor="middle"
                 >
@@ -157,9 +188,10 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: themeColors.surface,
     borderRadius: 15,
-    padding: 20,
+    padding: 15,
     elevation: 3,
     marginBottom: 15,
+    marginHorizontal: 15,
   },
   title: {
     fontSize: 18,
@@ -170,7 +202,9 @@ const styles = StyleSheet.create({
   scrollContainer: {
     marginHorizontal: -20,
     paddingHorizontal: 20,
-    marginBottom: 15,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.01)',
+    borderRadius: 10,
   },
   legend: {
     flexDirection: 'row',

@@ -17,6 +17,7 @@ import PieChart from '../../components/PieChart';
 import { CATEGORY_ICONS } from '../../constants/categories';
 import { colors as themeColors } from '../../constants/theme';
 import { Transaction, useTransactions } from '../../contexts/TransactionContext';
+import { getAppStartDate, canNavigateToPreviousYear, getMonthsWithData, getYearsWithData } from '../../utils/dateUtils';
 
 const CHART_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -24,12 +25,23 @@ const CHART_COLORS = [
 ];
 
 export default function ReportsScreen() {
-  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, getCategoryWiseExpense, getAccountWiseData } = useTransactions();
+  const { getMonthlyTransactions, getTotalExpense, getTotalIncome, getCategoryWiseExpense, getAccountWiseData, transactions, bills } = useTransactions();
   const insets = useSafeAreaInsets();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [appStartDate, setAppStartDate] = useState(new Date());
+  const [monthsWithData, setMonthsWithData] = useState<Set<string>>(new Set());
+  const [yearsWithData, setYearsWithData] = useState<Set<number>>(new Set());
+
+  // Calculate app start date and months/years with data
+  useEffect(() => {
+    const startDate = getAppStartDate(transactions, bills);
+    setAppStartDate(startDate);
+    setMonthsWithData(getMonthsWithData(transactions, bills));
+    setYearsWithData(getYearsWithData(transactions, bills));
+  }, [transactions, bills]);
 
   const monthlyTransactions = getMonthlyTransactions(selectedYear, selectedMonth);
   const currentMonthIncome = getTotalIncome(selectedYear, selectedMonth);
@@ -175,6 +187,8 @@ export default function ReportsScreen() {
           setSelectedYear(year);
         }}
         allowFutureMonths={false}
+        minDate={appStartDate}
+        monthsWithData={monthsWithData}
       />
 
       {renderMonthlyStatsCard()}
@@ -229,7 +243,25 @@ export default function ReportsScreen() {
   const renderYearlyDetails = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
-    const canNavigateNextYear = selectedYear < currentYear;
+    const appStartYear = appStartDate.getFullYear();
+    const canNavigatePrevYear = canNavigateToPreviousYear(selectedYear, appStartDate) && yearsWithData.has(selectedYear - 1);
+    const canNavigateNextYear = selectedYear < currentYear && yearsWithData.has(selectedYear + 1);
+
+    const handleYearChange = (offset: number) => {
+      const newYear = selectedYear + offset;
+      
+      // Validate year boundaries
+      if (newYear < appStartYear || newYear > currentYear) {
+        return;
+      }
+
+      // Check if year has data
+      if (!yearsWithData.has(newYear)) {
+        return;
+      }
+      
+      setSelectedYear(newYear);
+    };
 
     return (
     <ScrollView
@@ -241,14 +273,15 @@ export default function ReportsScreen() {
       {/* Year selector */}
       <View style={styles.yearSelectorContainer}>
         <TouchableOpacity
-          onPress={() => setSelectedYear(selectedYear - 1)}
-          style={styles.yearButton}
+          onPress={() => handleYearChange(-1)}
+          style={[styles.yearButton, !canNavigatePrevYear && styles.disabledYearButton]}
+          disabled={!canNavigatePrevYear}
         >
-          <Text style={styles.yearButtonText}>◀</Text>
+          <Text style={[styles.yearButtonText, !canNavigatePrevYear && styles.disabledYearButtonText]}>◀</Text>
         </TouchableOpacity>
         <Text style={styles.yearDisplay}>{selectedYear}</Text>
         <TouchableOpacity
-          onPress={() => setSelectedYear(selectedYear + 1)}
+          onPress={() => handleYearChange(1)}
           style={[styles.yearButton, !canNavigateNextYear && styles.disabledYearButton]}
           disabled={!canNavigateNextYear}
         >
@@ -262,7 +295,7 @@ export default function ReportsScreen() {
       <BarChart
         title="Monthly Income vs Expense"
         data={yearlyData.barChartData}
-        height={300}
+        height={450}
       />
 
       {/* Monthly details table */}
